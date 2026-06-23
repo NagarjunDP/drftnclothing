@@ -1,0 +1,92 @@
+export interface Product {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  price: number;
+  compare_price?: number;
+  category: string; // tees, hoodies, joggers, accessories
+  gender: string; // unisex, men, women
+  images: string[];
+  sizes: string[];
+  stock_quantity: Record<string, number>; // e.g., { XS: 10, S: 5 }
+  is_featured: boolean;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  image_url: string;
+  is_active: boolean;
+  created_at?: string;
+}
+
+export interface Order {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  shipping_address: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
+  items: CartItem[];
+  subtotal: number;
+  shipping_charge: number;
+  total: number;
+  payment_status: 'pending' | 'paid' | 'failed';
+  payment_id?: string;
+  order_status: 'placed' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled';
+  tracking_number?: string;
+  courier_partner?: string;
+  created_at?: string;
+}
+
+export interface DiscountCode {
+  id: string;
+  code: string;
+  discount_type: 'percent' | 'flat';
+  discount_value: number;
+  min_order_value: number;
+  usage_limit?: number;
+  used_count: number;
+  is_active: boolean;
+  expires_at?: string;
+}
+
+export interface StoreSettings {
+  store_name: string;
+  contact_number: string;
+  instagram_handle: string;
+  free_shipping_threshold: number;
+  default_shipping_charge: number;
+  razorpay_key_id: string;
+  razorpay_key_secret: string;
+  nimbuspost_api_key: string;
+}
+
+export interface CartItem {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  compare_price?: number;
+  image: string;
+  size: string;
+  quantity: number;
+}
+
+export interface ContactSubmission {
+  id: string;
+  name: string;
+  email: string;
+  message: string;
+  created_at?: string;
+}
