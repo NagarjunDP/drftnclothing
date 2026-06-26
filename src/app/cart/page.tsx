@@ -36,8 +36,8 @@ export default function CartPage() {
   }, []);
 
   const subtotal = getCartTotal();
-  const freeShippingThreshold = storeSettings?.free_shipping_threshold ?? 999;
-  const defaultShippingCharge = storeSettings?.default_shipping_charge ?? 99;
+  const freeShippingThreshold = storeSettings?.free_shipping_threshold ?? 99900;
+  const defaultShippingCharge = storeSettings?.default_shipping_charge ?? 9900;
 
   // Calculate shipping
   const shippingCharge = subtotal >= freeShippingThreshold || subtotal === 0 ? 0 : defaultShippingCharge;
@@ -59,26 +59,28 @@ export default function CartPage() {
     if (!promoInput.trim()) return;
 
     try {
-      const codeData = await dbService.getDiscountCodeByCode(promoInput);
-      if (!codeData) {
-        toast.error('Invalid promo code!');
+      const res = await fetch('/api/discount/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: promoInput, subtotal }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        toast.error(data.message || 'Invalid promo code!');
         return;
       }
 
-      // Check min order value requirement
-      if (subtotal < codeData.min_order_value) {
-        toast.error(`Minimum order value to apply this code is ₹${codeData.min_order_value}`);
-        return;
-      }
-
-      // Check usage limits
-      if (codeData.usage_limit && codeData.used_count >= codeData.usage_limit) {
-        toast.error('This promo code has reached its usage limit!');
-        return;
-      }
-
-      applyDiscount(codeData);
-      toast.success(`Promo code "${codeData.code}" applied successfully!`);
+      applyDiscount({
+        id: 'applied-coupon',
+        code: promoInput.toUpperCase().trim(),
+        discount_type: data.discount_type,
+        discount_value: data.discount_value,
+        min_order_value: 0,
+        used_count: 0,
+        is_active: true
+      });
+      toast.success(data.message || `Promo code applied successfully!`);
       setPromoInput('');
     } catch (err) {
       toast.error('Error applying coupon.');
@@ -147,7 +149,7 @@ export default function CartPage() {
                       <p className="text-xs text-zinc-500 font-bold uppercase mt-1">SIZE: {item.size}</p>
                     </div>
                     <span className="text-base font-extrabold text-brand-offwhite">
-                      ₹{item.price * item.quantity}
+                      ₹{((item.price * item.quantity) / 100).toFixed(2)}
                     </span>
                   </div>
 
@@ -212,7 +214,7 @@ export default function CartPage() {
             <div className="space-y-3.5 text-xs">
               <div className="flex justify-between items-center text-zinc-500">
                 <span>Bag Subtotal</span>
-                <span className="font-semibold text-brand-offwhite">₹{subtotal}</span>
+                <span className="font-semibold text-brand-offwhite">₹{(subtotal / 100).toFixed(2)}</span>
               </div>
 
               {/* Promo code line */}
@@ -223,7 +225,7 @@ export default function CartPage() {
                     <span className="uppercase font-bold">VOUCHER: {discountCode.code}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold">-₹{discountAmount}</span>
+                    <span className="font-bold">-₹{(discountAmount / 100).toFixed(2)}</span>
                     <button
                       onClick={handleRemovePromo}
                       className="text-zinc-500 hover:text-brand-red text-[10px] uppercase font-bold tracking-widest border border-zinc-800 rounded px-1.5 py-0.5"
@@ -241,14 +243,14 @@ export default function CartPage() {
                     FREE
                   </span>
                 ) : (
-                  <span className="font-semibold text-brand-offwhite">₹{shippingCharge}</span>
+                  <span className="font-semibold text-brand-offwhite">₹{(shippingCharge / 100).toFixed(2)}</span>
                 )}
               </div>
 
               {/* Threshold indicator */}
               {shippingCharge > 0 && !loadingSettings && (
                 <p className="text-[10px] text-zinc-500 bg-zinc-950 p-2.5 rounded leading-relaxed border border-zinc-900">
-                  Add <strong className="text-brand-offwhite">₹{freeShippingThreshold - subtotal}</strong> more to your bag to unlock <strong className="text-emerald-400">FREE SHIPPING</strong>.
+                  Add <strong className="text-brand-offwhite">₹{((freeShippingThreshold - subtotal) / 100).toFixed(2)}</strong> more to your bag to unlock <strong className="text-emerald-400">FREE SHIPPING</strong>.
                 </p>
               )}
             </div>
@@ -258,7 +260,7 @@ export default function CartPage() {
             {/* Total line */}
             <div className="flex justify-between items-center text-sm font-bold uppercase tracking-wider">
               <span className="text-brand-offwhite">Estimated Total</span>
-              <span className="text-xl font-extrabold text-brand-offwhite">₹{finalTotal}</span>
+              <span className="text-xl font-extrabold text-brand-offwhite">₹{(finalTotal / 100).toFixed(2)}</span>
             </div>
 
             {/* Proceed CTA */}

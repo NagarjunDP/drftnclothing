@@ -1,26 +1,175 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, ChevronRight } from 'lucide-react';
 import { dbService } from '@/lib/db';
 import { Product, Category } from '@/types';
 import { useCartStore } from '@/lib/cartStore';
 import { toast } from '@/lib/toast';
 
+/* ──────────────────────────────────────────
+   REVEAL-ON-SCROLL HOOK
+   ────────────────────────────────────────── */
+function useReveal() {
+  const ref = useRef<HTMLElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold: 0.12 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  return { ref, visible };
+}
+
+/* ──────────────────────────────────────────
+   COUNTER ANIMATION
+   ────────────────────────────────────────── */
+function AnimatedCounter({ to, suffix = '' }: { to: number; suffix?: string }) {
+  const [count, setCount] = useState(0);
+  const { ref, visible } = useReveal();
+
+  useEffect(() => {
+    if (!visible) return;
+    let start = 0;
+    const step = Math.ceil(to / 50);
+    const timer = setInterval(() => {
+      start += step;
+      if (start >= to) { setCount(to); clearInterval(timer); }
+      else setCount(start);
+    }, 30);
+    return () => clearInterval(timer);
+  }, [visible, to]);
+
+  return (
+    <span ref={ref as React.RefObject<HTMLSpanElement>}>
+      {count}{suffix}
+    </span>
+  );
+}
+
+/* ──────────────────────────────────────────
+   PRODUCT CARD
+   ────────────────────────────────────────── */
+function ProductCard({ prod, onQuickAdd }: { prod: Product; onQuickAdd: (e: React.MouseEvent, p: Product) => void }) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <Link
+      href={`/shop/${prod.slug}`}
+      className="group product-card block"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Image */}
+      <div className="product-card-image aspect-[3/4] bg-brand-graphite overflow-hidden relative">
+        <img
+          src={prod.images[0] || 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800'}
+          alt={prod.name}
+          className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06]"
+          loading="lazy"
+        />
+
+        {/* Overlay */}
+        <div className={`absolute inset-0 bg-gradient-to-t from-brand-black/70 via-transparent to-transparent transition-opacity duration-500 ${hovered ? 'opacity-100' : 'opacity-0'}`} />
+
+        {/* Badges */}
+        <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+          {prod.compare_price && prod.compare_price > prod.price && (
+            <span className="bg-brand-red text-brand-offwhite text-[9px] font-bold py-1 px-2 tracking-widest uppercase">
+              Sale
+            </span>
+          )}
+          {prod.is_featured && (
+            <span className="bg-brand-gold text-brand-black text-[9px] font-bold py-1 px-2 tracking-widest uppercase">
+              Featured
+            </span>
+          )}
+        </div>
+
+        {/* Quick Add */}
+        <div
+          className={`absolute bottom-0 inset-x-0 p-4 transition-all duration-400 ${hovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
+            }`}
+        >
+          <button
+            onClick={(e) => onQuickAdd(e, prod)}
+            className="w-full bg-brand-offwhite text-brand-black text-[10px] tracking-[0.2em] font-bold py-3 uppercase hover:bg-brand-red hover:text-brand-offwhite transition-colors duration-200"
+            id={`quick-add-${prod.id}`}
+          >
+            Add to Bag
+          </button>
+        </div>
+      </div>
+
+      {/* Details */}
+      <div className="pt-4 space-y-1">
+        <p className="text-[10px] text-brand-gray tracking-[0.2em] uppercase font-medium">{prod.category}</p>
+        <h3 className="text-sm font-semibold text-brand-offwhite tracking-wide line-clamp-1 group-hover:text-brand-cream transition-colors font-body">
+          {prod.name}
+        </h3>
+        <div className="flex items-center gap-2 pt-1">
+          <span className="text-sm font-semibold text-brand-offwhite font-body">
+            ₹{(prod.price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+          </span>
+          {prod.compare_price && prod.compare_price > prod.price && (
+            <span className="text-xs text-brand-gray line-through">
+              ₹{(prod.compare_price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+            </span>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/* ──────────────────────────────────────────
+   MAIN PAGE COMPONENT
+   ────────────────────────────────────────── */
 export default function Homepage() {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [heroImageLoaded, setHeroImageLoaded] = useState(false);
   const addItem = useCartStore((state) => state.addItem);
+
+  // Section refs for reveal
+  const heroRef = useRef<HTMLElement>(null);
+  const statsRef = useRef<HTMLElement>(null);
+  const categoryRef = useRef<HTMLElement>(null);
+  const featuredRef = useRef<HTMLElement>(null);
+  const storyRef = useRef<HTMLElement>(null);
+  const igRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    // Intersection observer for section reveals
+    const sections = [statsRef, categoryRef, featuredRef, storyRef, igRef];
+    const obs = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.querySelectorAll('.reveal').forEach((el) => el.classList.add('visible'));
+          }
+        });
+      },
+      { threshold: 0.08 }
+    );
+
+    sections.forEach((ref) => { if (ref.current) obs.observe(ref.current); });
+    return () => obs.disconnect();
+  }, []);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [prods, cats] = await Promise.all([
-          dbService.getProducts(),
-          dbService.getCategories(),
-        ]);
+        const [prods, cats] = await Promise.all([dbService.getProducts(), dbService.getCategories()]);
         setFeaturedProducts(prods.filter((p) => p.is_featured).slice(0, 4));
         setCategories(cats.slice(0, 4));
       } catch (err) {
@@ -35,17 +184,9 @@ export default function Homepage() {
   const handleQuickAdd = (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    // Pick the first available size in stock, or default to S/M
-    const availableSizes = product.sizes.filter(s => (product.stock_quantity[s] || 0) > 0);
-    
-    if (availableSizes.length === 0) {
-      toast.error('This product is completely sold out!');
-      return;
-    }
-
+    const availableSizes = product.sizes.filter((s) => (product.stock_quantity[s] || 0) > 0);
+    if (availableSizes.length === 0) { toast.error('This product is sold out!'); return; }
     const defaultSize = availableSizes.includes('M') ? 'M' : availableSizes[0];
-    
     addItem({
       id: product.id,
       name: product.name,
@@ -55,265 +196,494 @@ export default function Homepage() {
       image: product.images[0] || 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800',
       size: defaultSize,
     }, 1);
-    
-    toast.success(`Added ${product.name} (Size ${defaultSize}) to bag!`);
+    toast.success(`${product.name} added to your bag`);
   };
 
   return (
-    <div className="w-full flex flex-col">
-      {/* 1. HERO SECTION */}
-      <section className="relative w-full h-[80vh] md:h-[90vh] bg-black flex items-center justify-center overflow-hidden border-b border-zinc-900">
-        {/* Animated Background Image Grid Overlay */}
-        <div className="absolute inset-0 opacity-40 select-none">
-          <div className="absolute inset-0 bg-gradient-to-t from-brand-black via-brand-black/70 to-transparent z-10"></div>
+    <div className="w-full flex flex-col bg-brand-black">
+
+      {/* ════════════════════════════════════════
+          1. HERO — CINEMATIC FULL-BLEED
+          ════════════════════════════════════════ */}
+      <section
+        ref={heroRef}
+        className="relative w-full h-[92vh] min-h-[600px] overflow-hidden flex items-end"
+      >
+        {/* Background Image */}
+        <div className="absolute inset-0">
           <img
-            src="https://images.unsplash.com/photo-1509281373149-e957c6296406?w=1600&auto=format&fit=crop&q=80"
-            alt="Hero Background"
-            className="w-full h-full object-cover scale-105 filter grayscale contrast-125"
+            src="https://images.unsplash.com/photo-1509281373149-e957c6296406?w=1800&auto=format&fit=crop&q=85&sat=-30"
+            alt="DRFTN Hero"
+            className={`w-full h-full object-cover object-center transition-opacity duration-1000 ${heroImageLoaded ? 'opacity-100' : 'opacity-0'}`}
+            onLoad={() => setHeroImageLoaded(true)}
           />
+          {/* Gradient overlays */}
+          <div className="absolute inset-0 bg-gradient-to-t from-brand-black via-brand-black/50 to-brand-black/20" />
+          <div className="absolute inset-0 bg-gradient-to-r from-brand-black/60 via-transparent to-transparent" />
         </div>
 
         {/* Hero Content */}
-        <div className="relative z-20 text-center px-4 max-w-4xl space-y-6">
-          <p className="text-brand-red text-xs md:text-sm font-bold uppercase tracking-[0.4em] animate-fade-in">
-            NEW DROP / STREETWEAR ARCHIVE
-          </p>
-          <h1 className="text-5xl md:text-8xl font-black tracking-[0.25em] text-brand-offwhite uppercase select-none drop-shadow-2xl">
-            D R F T N
-          </h1>
-          <p className="text-zinc-400 text-sm md:text-lg tracking-widest uppercase italic font-light">
-            &quot;Drift in Style&quot;
-          </p>
-          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/shop"
-              className="btn-electric w-full sm:w-auto bg-brand-offwhite text-brand-black hover:bg-brand-red hover:text-brand-offwhite font-bold text-xs uppercase tracking-widest py-4 px-8 rounded shadow-lg transition-all duration-300"
+        <div className="relative z-10 w-full max-w-screen-2xl mx-auto px-6 md:px-12 pb-16 md:pb-24">
+          <div className="max-w-2xl">
+            {/* Label */}
+            <div className="flex items-center gap-3 mb-6 animate-fade-in" style={{ animationDelay: '0.2s', animationFillMode: 'both', opacity: 0 }}>
+              <span className="block w-8 h-px bg-brand-gold" />
+              <span className="text-brand-gold text-[10px] font-semibold tracking-[0.3em] uppercase font-body">
+                Summer Drop 2025
+              </span>
+            </div>
+
+            {/* Headline */}
+            <h1
+              className="text-brand-offwhite mb-6 animate-fade-up"
+              style={{
+                fontFamily: "'Playfair Display', Georgia, serif",
+                fontSize: 'clamp(3.5rem, 9vw, 8rem)',
+                fontWeight: 700,
+                lineHeight: 1.0,
+                letterSpacing: '-0.02em',
+                animationDelay: '0.4s',
+                animationFillMode: 'both',
+                opacity: 0,
+              }}
             >
-              Shop Collection
-            </Link>
-            <Link
-              href="/about"
-              className="w-full sm:w-auto border border-zinc-800 text-brand-offwhite hover:border-brand-offwhite font-bold text-xs uppercase tracking-widest py-4 px-8 rounded transition-all duration-300"
+              Drift in
+              <br />
+              <em className="text-brand-cream italic">Style.</em>
+            </h1>
+
+            {/* Subline */}
+            <p
+              className="text-brand-silver text-sm md:text-base font-light leading-relaxed max-w-md mb-8 animate-fade-up font-body"
+              style={{ animationDelay: '0.6s', animationFillMode: 'both', opacity: 0 }}
             >
-              The Story
-            </Link>
+              Premium streetwear rooted in Yelahanka, Bengaluru.
+              Heavy fabrics. Unisex silhouettes. Zero compromise.
+            </p>
+
+            {/* CTAs */}
+            <div
+              className="flex flex-col sm:flex-row items-start gap-4 animate-fade-up"
+              style={{ animationDelay: '0.8s', animationFillMode: 'both', opacity: 0 }}
+            >
+              <Link href="/shop" className="btn-primary">
+                <span>Shop Collection</span>
+                <ArrowRight className="w-3.5 h-3.5 relative z-10" />
+              </Link>
+              <Link href="/about" className="btn-outline">
+                <span>Our Story</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Scroll indicator */}
+        <div className="absolute bottom-8 right-8 md:right-12 z-10 flex flex-col items-center gap-2 opacity-40">
+          <span className="text-[9px] tracking-[0.3em] text-brand-silver uppercase rotate-90 origin-center font-body">Scroll</span>
+          <div className="w-px h-12 bg-brand-silver/40 relative overflow-hidden">
+            <div className="absolute inset-0 bg-brand-silver animate-pulse-slow" />
           </div>
         </div>
       </section>
 
-      {/* 2. CATEGORY GRID */}
-      <section className="py-20 px-6 md:px-12 max-w-7xl mx-auto w-full">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-4">
-          <div>
-            <span className="text-brand-red text-xs font-bold uppercase tracking-widest">DRFTN DEPTS</span>
-            <h2 className="text-3xl md:text-4xl font-extrabold tracking-wide uppercase text-brand-offwhite mt-1">
-              SHOP BY CATEGORY
-            </h2>
-          </div>
-          <Link
-            href="/shop"
-            className="text-xs font-bold uppercase tracking-widest text-brand-offwhite hover:text-brand-red transition-colors flex items-center gap-2 group"
-          >
-            Browse All <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-          {categories.map((cat) => (
-            <Link
-              key={cat.id}
-              href={`/shop?category=${cat.slug}`}
-              className="group relative h-64 md:h-80 rounded overflow-hidden border border-zinc-900 bg-zinc-950 flex items-end p-6"
-            >
-              {/* Bg Image */}
-              <div className="absolute inset-0 opacity-60 group-hover:opacity-75 transition-opacity duration-500">
-                <img
-                  src={cat.image_url}
-                  alt={cat.name}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 filter grayscale group-hover:grayscale-0"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-brand-black via-brand-black/40 to-transparent"></div>
-              </div>
-              
-              {/* Content */}
-              <div className="relative z-10 w-full">
-                <h3 className="text-lg font-bold uppercase tracking-wider text-brand-offwhite group-hover:text-brand-red transition-colors">
-                  {cat.name}
-                </h3>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-0.5">Explore Dept</p>
-              </div>
-            </Link>
+      {/* ════════════════════════════════════════
+          2. TRUST / STATS BAR
+          ════════════════════════════════════════ */}
+      <section ref={statsRef} className="border-y border-brand-graphite bg-brand-charcoal py-8 px-6 md:px-12">
+        <div className="max-w-screen-2xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-0 md:divide-x md:divide-brand-muted/40">
+          {[
+            { value: 5000, suffix: '+', label: 'Happy Customers' },
+            { value: 100, suffix: '%', label: 'Premium Fabrics' },
+            { value: 48, suffix: 'h', label: 'Dispatch Time' },
+            { value: 4, suffix: '★', label: 'Avg. Rating' },
+          ].map((stat, i) => (
+            <div key={i} className={`reveal reveal-delay-${i + 1} text-center px-6 flex flex-col items-center gap-1.5`}>
+              <span
+                className="text-3xl md:text-4xl font-bold text-brand-offwhite"
+                style={{ fontFamily: "'Playfair Display', serif" }}
+              >
+                <AnimatedCounter to={stat.value} suffix={stat.suffix} />
+              </span>
+              <span className="text-[10px] tracking-[0.2em] uppercase text-brand-gray font-body font-medium">
+                {stat.label}
+              </span>
+            </div>
           ))}
         </div>
       </section>
 
-      {/* 3. FEATURED PRODUCTS SECTION */}
-      <section className="py-20 px-6 md:px-12 bg-zinc-950/40 border-y border-zinc-900 w-full">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-lg mx-auto mb-16 space-y-2">
-            <span className="text-brand-red text-xs font-bold uppercase tracking-widest">DRFTN EXCLUSIVES</span>
-            <h2 className="text-3xl md:text-4xl font-extrabold tracking-wide uppercase text-brand-offwhite">
-              HOTTEST DROPS
+      {/* ════════════════════════════════════════
+          3. CATEGORIES — EDITORIAL GRID
+          ════════════════════════════════════════ */}
+      <section ref={categoryRef} className="py-24 md:py-32 px-6 md:px-12 max-w-screen-2xl mx-auto w-full">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-14 gap-6 reveal">
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="block w-6 h-px bg-brand-gold" />
+              <span className="text-brand-gold text-[10px] font-semibold tracking-[0.3em] uppercase font-body">
+                Departments
+              </span>
+            </div>
+            <h2
+              className="text-brand-offwhite leading-none"
+              style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+                fontWeight: 700,
+              }}
+            >
+              Shop by Category
             </h2>
-            <p className="text-zinc-500 text-xs leading-relaxed max-w-sm mx-auto">
-              Our curated street essentials featuring heavyweight fabric, oversized cuts, and drop-shoulder silhouettes.
-            </p>
+          </div>
+          <Link
+            href="/shop"
+            className="group flex items-center gap-2 text-[11px] text-brand-silver hover:text-brand-offwhite tracking-[0.2em] uppercase font-semibold transition-colors font-body"
+          >
+            View All
+            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </Link>
+        </div>
+
+        {/* Category Grid */}
+        {categories.length > 0 ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            {categories.map((cat, i) => (
+              <Link
+                key={cat.id}
+                href={`/shop?category=${cat.slug}`}
+                className={`group reveal reveal-delay-${(i % 4) + 1} relative overflow-hidden bg-brand-graphite ${i === 0 ? 'row-span-1 md:col-span-2 aspect-[16/10] md:aspect-auto md:h-96' : 'aspect-[3/4]'
+                  }`}
+              >
+                <img
+                  src={cat.image_url}
+                  alt={cat.name}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06] filter grayscale group-hover:grayscale-0"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-brand-black/90 via-brand-black/30 to-transparent" />
+
+                <div className="absolute bottom-0 inset-x-0 p-6 md:p-8">
+                  <h3
+                    className="text-brand-offwhite text-lg md:text-2xl font-semibold mb-1 group-hover:text-brand-cream transition-colors"
+                    style={{ fontFamily: "'Playfair Display', serif" }}
+                  >
+                    {cat.name}
+                  </h3>
+                  <span className="flex items-center gap-1.5 text-[10px] text-brand-gold tracking-[0.2em] uppercase font-body font-medium">
+                    Explore <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                  </span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          // Fallback skeleton
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="aspect-[3/4] shimmer" />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ════════════════════════════════════════
+          4. FEATURED PRODUCTS
+          ════════════════════════════════════════ */}
+      <section
+        ref={featuredRef}
+        className="py-24 md:py-32 px-6 md:px-12 border-t border-brand-graphite bg-brand-charcoal/30 w-full"
+      >
+        <div className="max-w-screen-2xl mx-auto">
+          {/* Header */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-14 gap-6 reveal">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="block w-6 h-px bg-brand-gold" />
+                <span className="text-brand-gold text-[10px] font-semibold tracking-[0.3em] uppercase font-body">
+                  Exclusives
+                </span>
+              </div>
+              <h2
+                className="text-brand-offwhite leading-none"
+                style={{
+                  fontFamily: "'Playfair Display', serif",
+                  fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+                  fontWeight: 700,
+                }}
+              >
+                Hottest Drops
+              </h2>
+            </div>
+            <Link
+              href="/shop"
+              className="group flex items-center gap-2 text-[11px] text-brand-silver hover:text-brand-offwhite tracking-[0.2em] uppercase font-semibold transition-colors font-body"
+            >
+              View All Products
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
           </div>
 
+          {/* Products */}
           {loading ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 animate-pulse">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="aspect-[3/4] bg-zinc-900 border border-zinc-800 rounded-md"></div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="space-y-3">
+                  <div className="aspect-[3/4] shimmer" />
+                  <div className="h-3 shimmer w-2/3" />
+                  <div className="h-4 shimmer w-3/4" />
+                </div>
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-              {featuredProducts.map((prod) => (
-                <Link
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+              {featuredProducts.map((prod, i) => (
+                <div
                   key={prod.id}
-                  href={`/shop/${prod.slug}`}
-                  className="group flex flex-col h-full border border-zinc-900/60 rounded-md overflow-hidden bg-brand-black/40 hover:border-zinc-800 transition-all duration-300 relative"
+                  className={`reveal reveal-delay-${(i % 4) + 1}`}
                 >
-                  {/* Image Container */}
-                  <div className="aspect-[3/4] bg-zinc-950 relative overflow-hidden">
-                    <img
-                      src={prod.images[0]}
-                      alt={prod.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 filter grayscale hover:filter-none"
-                    />
-                    
-                    {/* Discount Badge */}
-                    {prod.compare_price && prod.compare_price > prod.price && (
-                      <span className="absolute top-3 left-3 bg-brand-red text-brand-offwhite text-[9px] font-bold py-1 px-2.5 rounded tracking-wider uppercase">
-                        Sale
-                      </span>
-                    )}
-
-                    {/* Quick Add Overlay */}
-                    <div className="absolute inset-0 bg-brand-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center p-4">
-                      <button
-                        onClick={(e) => handleQuickAdd(e, prod)}
-                        className="w-full bg-brand-offwhite text-brand-black text-[10px] tracking-widest font-extrabold py-3 px-4 rounded hover:bg-brand-red hover:text-brand-offwhite transition-colors duration-200 uppercase"
-                      >
-                        Quick Add
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Product details */}
-                  <div className="p-4 space-y-1 flex-1 flex flex-col justify-between">
-                    <div>
-                      <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
-                        {prod.category}
-                      </p>
-                      <h3 className="text-sm font-bold text-brand-offwhite tracking-wide uppercase line-clamp-1 group-hover:text-brand-red transition-colors">
-                        {prod.name}
-                      </h3>
-                    </div>
-                    <div className="flex items-center gap-2 pt-2">
-                      <span className="text-sm font-bold text-brand-offwhite">
-                        ₹{prod.price}
-                      </span>
-                      {prod.compare_price && (
-                        <span className="text-xs text-zinc-600 line-through">
-                          ₹{prod.compare_price}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </Link>
+                  <ProductCard prod={prod} onQuickAdd={handleQuickAdd} />
+                </div>
               ))}
             </div>
           )}
         </div>
       </section>
 
-      {/* 4. BRAND STORY SECTION */}
-      <section className="py-24 px-6 md:px-12 max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-        <div className="space-y-6">
-          <span className="text-brand-red text-xs font-bold uppercase tracking-widest">ABOUT DRFTN</span>
-          <h2 className="text-4xl md:text-5xl font-black tracking-wide uppercase text-brand-offwhite leading-tight">
-            BORN IN YELAHANKA.<br/>BUILT FOR THE STREETS.
-          </h2>
-          <p className="text-zinc-500 text-sm leading-relaxed max-w-lg">
-            DRFTN CLOTHING is a premium D2C brand that represents the spirit of youth culture in Yelahanka, Bengaluru. Inspired by industrial minimalism and global streetwear, we build apparel that balances durability with a relaxed unisex fit.
-          </p>
-          <p className="text-zinc-500 text-sm leading-relaxed max-w-lg">
-            Every garment we produce is created using curated heavyweight fabrics, drop shoulder tailoring, and bold graphic expressions. We don&apos;t follow trends—we set the drift.
-          </p>
-          <div className="pt-2">
-            <Link
-              href="/about"
-              className="text-xs font-bold uppercase tracking-widest text-brand-offwhite hover:text-brand-red transition-colors flex items-center gap-2 group"
+      {/* ════════════════════════════════════════
+          5. BRAND STORY — EDITORIAL SPLIT
+          ════════════════════════════════════════ */}
+      <section
+        ref={storyRef}
+        className="py-24 md:py-40 px-6 md:px-12 max-w-screen-2xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-center"
+      >
+        {/* Text */}
+        <div className="space-y-8">
+          <div className="reveal space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="block w-6 h-px bg-brand-gold" />
+              <span className="text-brand-gold text-[10px] font-semibold tracking-[0.3em] uppercase font-body">
+                The Brand
+              </span>
+            </div>
+            <h2
+              className="text-brand-offwhite leading-tight"
+              style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: 'clamp(2.2rem, 5vw, 4rem)',
+                fontWeight: 700,
+              }}
             >
-              Read Our Full Philosophy <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              Born in Yelahanka.
+              <br />
+              <em className="italic text-brand-cream">Built for the World.</em>
+            </h2>
+          </div>
+
+          <div className="reveal reveal-delay-2 space-y-4">
+            <p className="text-brand-silver text-sm md:text-base leading-relaxed font-body font-light">
+              DRFTN CLOTHING is a premium D2C brand that represents the spirit of youth culture
+              in Yelahanka, Bengaluru. Inspired by industrial minimalism and global streetwear,
+              we build apparel that balances durability with a relaxed unisex fit.
+            </p>
+            <p className="text-brand-gray text-sm leading-relaxed font-body font-light">
+              Every garment we produce is created using curated heavyweight fabrics,
+              drop shoulder tailoring, and bold graphic expressions. We don&apos;t follow
+              trends — we set the drift.
+            </p>
+          </div>
+
+          <div className="reveal reveal-delay-3 flex flex-col sm:flex-row gap-4 pt-2">
+            <Link href="/about" className="btn-primary">
+              <span>Read Our Philosophy</span>
+              <ArrowUpRight className="w-3.5 h-3.5 relative z-10" />
             </Link>
+          </div>
+
+          {/* Brand Values */}
+          <div className="reveal reveal-delay-4 grid grid-cols-3 gap-6 pt-4 border-t border-brand-graphite">
+            {['Heavyweight', 'Unisex Fit', 'D2C Direct'].map((val) => (
+              <div key={val} className="space-y-1">
+                <span className="block w-4 h-px bg-brand-gold mb-2" />
+                <p className="text-[11px] tracking-[0.15em] text-brand-silver uppercase font-body font-medium">
+                  {val}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Story Illustration Grid */}
-        <div className="grid grid-cols-2 gap-4 h-96">
-          <div className="h-full bg-zinc-900 rounded overflow-hidden">
+        {/* Images Collage */}
+        <div className="reveal reveal-delay-2 grid grid-cols-2 gap-3 h-[500px] md:h-[600px]">
+          <div className="overflow-hidden">
             <img
-              src="https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=500&auto=format&fit=crop&q=80"
+              src="https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=600&auto=format&fit=crop&q=85"
               alt="Streetwear model"
-              className="w-full h-full object-cover filter grayscale hover:filter-none transition-all duration-500"
+              className="w-full h-full object-cover hover:scale-105 transition-transform duration-700 ease-out grayscale hover:grayscale-0"
+              loading="lazy"
             />
           </div>
-          <div className="h-full bg-zinc-900 rounded overflow-hidden mt-6">
+          <div className="overflow-hidden mt-10">
             <img
-              src="https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=500&auto=format&fit=crop&q=80"
+              src="https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=600&auto=format&fit=crop&q=85"
               alt="Clothing detail"
-              className="w-full h-full object-cover filter grayscale hover:filter-none transition-all duration-500"
+              className="w-full h-full object-cover hover:scale-105 transition-transform duration-700 ease-out grayscale hover:grayscale-0"
+              loading="lazy"
             />
           </div>
         </div>
       </section>
 
-      {/* 5. INSTAGRAM FEED SECTION */}
-      <section className="py-20 px-6 md:px-12 bg-zinc-950/60 border-t border-zinc-900 w-full">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12 space-y-1">
-            <span className="text-brand-red text-xs font-bold uppercase tracking-widest">DRFTN LOOKBOOK</span>
-            <h2 className="text-2xl md:text-3xl font-extrabold uppercase text-brand-offwhite">
-              DRIFT WITH US ON INSTAGRAM
+      {/* ════════════════════════════════════════
+          6. MATERIAL FEATURE — EDITORIAL BANNER
+          ════════════════════════════════════════ */}
+      <section className="relative overflow-hidden border-t border-b border-brand-graphite">
+        <div className="relative h-64 md:h-80">
+          <img
+            src="https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=1600&auto=format&fit=crop&q=80"
+            alt="DRFTN fabric detail"
+            className="absolute inset-0 w-full h-full object-cover grayscale opacity-40"
+          />
+          <div className="absolute inset-0 bg-brand-black/70" />
+          <div className="relative z-10 h-full flex items-center justify-center text-center px-6">
+            <div className="space-y-4">
+              <p className="text-brand-gold text-[10px] tracking-[0.4em] uppercase font-body font-semibold">
+                Our Material Promise
+              </p>
+              <blockquote
+                className="text-brand-offwhite max-w-3xl mx-auto italic"
+                style={{
+                  fontFamily: "'Playfair Display', serif",
+                  fontSize: 'clamp(1.4rem, 4vw, 2.8rem)',
+                  fontWeight: 400,
+                  lineHeight: 1.3,
+                }}
+              >
+                &ldquo;Every thread is chosen with intention. Every cut is deliberate. Every garment is a statement.&rdquo;
+              </blockquote>
+              <p className="text-brand-gray text-xs tracking-[0.25em] uppercase font-body">
+                — DRFTN CLOTHING
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════
+          7. INSTAGRAM LOOKBOOK
+          ════════════════════════════════════════ */}
+      <section
+        ref={igRef}
+        className="py-24 md:py-32 px-6 md:px-12 w-full"
+      >
+        <div className="max-w-screen-2xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-14 reveal space-y-3">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <span className="block w-6 h-px bg-brand-gold" />
+              <span className="text-brand-gold text-[10px] font-semibold tracking-[0.3em] uppercase font-body">
+                Lookbook
+              </span>
+              <span className="block w-6 h-px bg-brand-gold" />
+            </div>
+            <h2
+              className="text-brand-offwhite"
+              style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: 'clamp(1.8rem, 4vw, 3rem)',
+                fontWeight: 700,
+              }}
+            >
+              Drift With Us
             </h2>
             <a
               href="https://instagram.com/drftnclothing"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-zinc-500 hover:text-brand-red transition-colors font-semibold uppercase tracking-widest block pt-1"
+              className="inline-flex items-center gap-1.5 text-[11px] text-brand-silver hover:text-brand-gold tracking-[0.2em] uppercase transition-colors font-body font-medium"
             >
               @drftnclothing
+              <ArrowUpRight className="w-3 h-3" />
             </a>
           </div>
 
-          {/* 6 Grid Squares */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          {/* Photo Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
             {[
-              'https://images.unsplash.com/photo-1509281373149-e957c6296406?w=400',
-              'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=400',
-              'https://images.unsplash.com/photo-1607990283143-e81e7a2c93ab?w=400',
-              'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400',
-              'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400',
-              'https://images.unsplash.com/photo-1534215754734-18e55d13e346?w=400'
+              'https://images.unsplash.com/photo-1509281373149-e957c6296406?w=500',
+              'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=500',
+              'https://images.unsplash.com/photo-1607990283143-e81e7a2c93ab?w=500',
+              'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=500',
+              'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500',
+              'https://images.unsplash.com/photo-1534215754734-18e55d13e346?w=500',
             ].map((url, i) => (
               <a
                 key={i}
                 href="https://instagram.com/drftnclothing"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="aspect-square bg-zinc-900 rounded overflow-hidden border border-zinc-900/60 block relative group"
+                className={`reveal reveal-delay-${(i % 4) + 1} aspect-square overflow-hidden block group bg-brand-graphite`}
               >
                 <img
                   src={url}
-                  alt={`Lookbook photo ${i}`}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 filter grayscale"
+                  alt={`Lookbook photo ${i + 1}`}
+                  className="w-full h-full object-cover transition-all duration-500 grayscale group-hover:grayscale-0 group-hover:scale-105"
+                  loading="lazy"
                 />
-                <div className="absolute inset-0 bg-brand-red/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </a>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════
+          8. EMAIL CAPTURE BANNER
+          ════════════════════════════════════════ */}
+      <section className="border-t border-brand-graphite bg-brand-charcoal py-20 px-6 md:px-12">
+        <div className="max-w-screen-2xl mx-auto text-center space-y-6">
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <span className="block w-6 h-px bg-brand-gold" />
+            <span className="text-brand-gold text-[10px] font-semibold tracking-[0.3em] uppercase font-body">
+              Inner Circle
+            </span>
+            <span className="block w-6 h-px bg-brand-gold" />
+          </div>
+          <h2
+            className="text-brand-offwhite mx-auto max-w-xl"
+            style={{
+              fontFamily: "'Playfair Display', serif",
+              fontSize: 'clamp(1.8rem, 4vw, 3rem)',
+              fontWeight: 700,
+            }}
+          >
+            Be First to the Drop
+          </h2>
+          <p className="text-brand-gray text-sm max-w-md mx-auto font-body font-light">
+            Get early access to exclusive releases, behind-the-scenes content, and member-only offers.
+          </p>
+          <form
+            className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto mt-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              toast.success("You're on the list! Welcome to the inner circle.");
+              (e.target as HTMLFormElement).reset();
+            }}
+          >
+            <input
+              type="email"
+              required
+              placeholder="your@email.com"
+              className="flex-1 px-4 py-3.5 text-sm bg-brand-graphite border border-brand-muted text-brand-offwhite placeholder-brand-gray focus:border-brand-gold focus:outline-none font-body"
+              id="newsletter-email"
+            />
+            <button
+              type="submit"
+              className="btn-primary whitespace-nowrap"
+              id="newsletter-submit"
+            >
+              <span>Join the List</span>
+            </button>
+          </form>
         </div>
       </section>
     </div>

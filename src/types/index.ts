@@ -40,12 +40,16 @@ export interface Order {
   items: CartItem[];
   subtotal: number;
   shipping_charge: number;
+  discount_code?: string | null;
+  discount_amount?: number | null;
   total: number;
-  payment_status: 'pending' | 'paid' | 'failed';
+  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   payment_id?: string;
+  razorpay_order_id?: string | null;
   order_status: 'placed' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled';
   tracking_number?: string;
   courier_partner?: string;
+  shiprocket_order_id?: string | null;
   created_at?: string;
 }
 

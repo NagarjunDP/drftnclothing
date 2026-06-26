@@ -110,7 +110,7 @@ export default function TrackOrderPage() {
             </div>
             <div className="text-left md:text-right">
               <p className="text-sm text-zinc-400 mb-1">Total Amount</p>
-              <p className="text-xl text-brand-offwhite font-mono font-bold">₹{order.total.toFixed(2)}</p>
+              <p className="text-xl text-brand-offwhite font-mono font-bold">₹{(order.total / 100).toFixed(2)}</p>
             </div>
           </div>
 
@@ -186,7 +186,7 @@ export default function TrackOrderPage() {
                     <p className="text-xs text-zinc-500">Size: {item.size} | Qty: {item.quantity}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-zinc-400 font-mono">₹{item.price.toFixed(2)}</p>
+                    <p className="text-sm text-zinc-400 font-mono">₹{(item.price / 100).toFixed(2)}</p>
                   </div>
                 </div>
               ))}

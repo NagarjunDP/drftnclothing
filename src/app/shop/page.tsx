@@ -89,7 +89,7 @@ function ShopContent() {
     }
 
     // Filter by Price
-    result = result.filter((p) => p.price <= priceRange);
+    result = result.filter((p) => (p.price / 100) <= priceRange);
 
     // Sort Logic
     if (sortBy === 'newest') {
@@ -357,11 +357,11 @@ function ShopContent() {
                     </div>
                     <div className="flex items-center gap-2 pt-2">
                       <span className="text-sm font-bold text-brand-offwhite">
-                        ₹{prod.price}
+                        ₹{(prod.price / 100).toFixed(2)}
                       </span>
                       {prod.compare_price && (
                         <span className="text-xs text-zinc-600 line-through">
-                          ₹{prod.compare_price}
+                          ₹{(prod.compare_price / 100).toFixed(2)}
                         </span>
                       )}
                     </div>

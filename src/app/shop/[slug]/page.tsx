@@ -201,9 +201,9 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
             {/* Pricing */}
             <div className="flex items-center gap-3">
-              <span className="text-xl md:text-2xl font-black text-brand-offwhite">₹{product.price}</span>
+              <span className="text-xl md:text-2xl font-black text-brand-offwhite">₹{(product.price / 100).toFixed(2)}</span>
               {product.compare_price && (
-                <span className="text-sm md:text-base text-zinc-500 line-through">₹{product.compare_price}</span>
+                <span className="text-sm md:text-base text-zinc-500 line-through">₹{(product.compare_price / 100).toFixed(2)}</span>
               )}
             </div>
 
@@ -390,7 +390,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                   <h4 className="text-xs font-bold text-brand-offwhite uppercase line-clamp-1 group-hover:text-brand-red transition-colors">
                     {p.name}
                   </h4>
-                  <p className="text-xs font-bold text-brand-offwhite">₹{p.price}</p>
+                  <p className="text-xs font-bold text-brand-offwhite">₹{(p.price / 100).toFixed(2)}</p>
                 </div>
               </Link>
             ))}

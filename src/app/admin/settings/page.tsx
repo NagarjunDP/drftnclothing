@@ -3,27 +3,47 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '@/lib/db';
 import { StoreSettings } from '@/types';
-import { Save } from 'lucide-react';
+import { Save, CheckCircle2, XCircle } from 'lucide-react';
 import { useToast } from '@/components/ToastContainer';
 
 export default function AdminSettings() {
   const { addToast } = useToast();
   const [settings, setSettings] = useState<StoreSettings | null>(null);
+  const [envStatus, setEnvStatus] = useState({
+    razorpay: false,
+    shiprocket: false,
+    makeWebhook: false,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const data = await db.getSettings();
-        setSettings(data);
-      } catch (error) {
-        console.error(error);
-        addToast('Failed to load settings', 'error');
-      } finally {
-        setIsLoading(false);
+  const fetchSettings = async () => {
+    try {
+      // Hits /api/admin/settings via client-side fetch router in db.ts
+      const res = await fetch('/api/admin/settings');
+      if (res.ok) {
+        const data = await res.json();
+        // Since we are storing values in paise, we convert free shipping threshold and shipping charges to Rupees for easy editing in the admin UI
+        setSettings({
+          ...data.settings,
+          free_shipping_threshold: data.settings.free_shipping_threshold / 100,
+          default_shipping_charge: data.settings.default_shipping_charge / 100,
+        });
+        if (data.envStatus) {
+          setEnvStatus(data.envStatus);
+        }
+      } else {
+        throw new Error('Failed to load settings');
       }
-    };
+    } catch (error) {
+      console.error(error);
+      addToast('Failed to load settings', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -31,11 +51,11 @@ export default function AdminSettings() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!settings) return;
     const { name, value, type } = e.target;
-    setSettings(prev => {
+    setSettings((prev) => {
       if (!prev) return prev;
       return {
         ...prev,
-        [name]: type === 'number' ? Number(value) : value
+        [name]: type === 'number' ? Number(value) : value,
       };
     });
   };
@@ -46,8 +66,23 @@ export default function AdminSettings() {
     
     setIsSaving(true);
     try {
-      await db.updateSettings(settings);
+      // Convert values back to paise before saving to database
+      const payload = {
+        ...settings,
+        free_shipping_threshold: Math.round(settings.free_shipping_threshold * 100),
+        default_shipping_charge: Math.round(settings.default_shipping_charge * 100),
+      };
+      
+      const res = await fetch('/api/admin/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error('Failed to save settings');
+      
       addToast('Settings updated successfully', 'success');
+      fetchSettings();
     } catch (error) {
       console.error(error);
       addToast('Failed to save settings', 'error');
@@ -65,7 +100,66 @@ export default function AdminSettings() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-800 pb-6">
         <div>
           <h1 className="text-2xl font-extrabold tracking-widest uppercase text-brand-offwhite">Store Settings</h1>
-          <p className="text-zinc-500 text-sm mt-1">Configure global store preferences and API keys.</p>
+          <p className="text-zinc-500 text-sm mt-1">Configure global store preferences and verify credentials.</p>
+        </div>
+      </div>
+
+      {/* Environment Variables Status Dashboard */}
+      <div className="bg-zinc-900/40 border border-zinc-800 p-6 md:p-8">
+        <h2 className="text-sm font-bold text-brand-offwhite mb-6 uppercase tracking-widest border-b border-zinc-800 pb-3">
+          Environment Connection Dashboard
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Razorpay Status */}
+          <div className="bg-zinc-900/30 border border-zinc-850 p-5 flex items-center justify-between">
+            <div>
+              <span className="text-xs uppercase tracking-wider text-zinc-500 block font-bold">Razorpay Gateway</span>
+              <span className="text-sm font-bold block mt-1 text-brand-offwhite">Prepaid Payments</span>
+            </div>
+            {envStatus.razorpay ? (
+              <div className="flex items-center gap-1 text-green-500 text-xs font-bold uppercase tracking-wider">
+                <CheckCircle2 className="w-4 h-4" /> Connected
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 text-brand-red text-xs font-bold uppercase tracking-wider">
+                <XCircle className="w-4 h-4" /> Unconfigured
+              </div>
+            )}
+          </div>
+
+          {/* Shiprocket Status */}
+          <div className="bg-zinc-900/30 border border-zinc-850 p-5 flex items-center justify-between">
+            <div>
+              <span className="text-xs uppercase tracking-wider text-zinc-500 block font-bold">Shiprocket Logistics</span>
+              <span className="text-sm font-bold block mt-1 text-brand-offwhite">Automatic Shipping</span>
+            </div>
+            {envStatus.shiprocket ? (
+              <div className="flex items-center gap-1 text-green-500 text-xs font-bold uppercase tracking-wider">
+                <CheckCircle2 className="w-4 h-4" /> Connected
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 text-brand-red text-xs font-bold uppercase tracking-wider">
+                <XCircle className="w-4 h-4" /> Unconfigured
+              </div>
+            )}
+          </div>
+
+          {/* Make.com Status */}
+          <div className="bg-zinc-900/30 border border-zinc-850 p-5 flex items-center justify-between">
+            <div>
+              <span className="text-xs uppercase tracking-wider text-zinc-500 block font-bold">Make Webhook URL</span>
+              <span className="text-sm font-bold block mt-1 text-brand-offwhite">WhatsApp Alerts</span>
+            </div>
+            {envStatus.makeWebhook ? (
+              <div className="flex items-center gap-1 text-green-500 text-xs font-bold uppercase tracking-wider">
+                <CheckCircle2 className="w-4 h-4" /> Connected
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 text-brand-red text-xs font-bold uppercase tracking-wider">
+                <XCircle className="w-4 h-4" /> Unconfigured
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -86,7 +180,7 @@ export default function AdminSettings() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Contact Number</label>
+              <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Contact WhatsApp Number</label>
               <input
                 type="text"
                 name="contact_number"
@@ -110,7 +204,7 @@ export default function AdminSettings() {
 
         {/* Shipping Preferences */}
         <div className="bg-zinc-900/30 border border-zinc-800 p-6 md:p-8">
-          <h2 className="text-lg font-bold text-brand-offwhite mb-6 uppercase tracking-wider border-b border-zinc-800 pb-2">Shipping Settings</h2>
+          <h2 className="text-lg font-bold text-brand-offwhite mb-6 uppercase tracking-wider border-b border-zinc-800 pb-2">Shipping Preferences</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Free Shipping Threshold (₹)</label>
@@ -135,51 +229,11 @@ export default function AdminSettings() {
           </div>
         </div>
 
-        {/* API Integrations */}
-        <div className="bg-zinc-900/30 border border-zinc-800 p-6 md:p-8">
-          <h2 className="text-lg font-bold text-brand-offwhite mb-6 uppercase tracking-wider border-b border-zinc-800 pb-2">API Keys (Integrations)</h2>
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Razorpay Key ID</label>
-              <input
-                type="password"
-                name="razorpay_key_id"
-                value={settings.razorpay_key_id}
-                onChange={handleChange}
-                placeholder="rzp_test_..."
-                className="w-full bg-zinc-900/80 border border-zinc-700 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors font-mono"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Razorpay Key Secret</label>
-              <input
-                type="password"
-                name="razorpay_key_secret"
-                value={settings.razorpay_key_secret}
-                onChange={handleChange}
-                placeholder="Secret Key"
-                className="w-full bg-zinc-900/80 border border-zinc-700 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors font-mono"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">NimbusPost API Key</label>
-              <input
-                type="password"
-                name="nimbuspost_api_key"
-                value={settings.nimbuspost_api_key}
-                onChange={handleChange}
-                placeholder="NimbusPost Token"
-                className="w-full bg-zinc-900/80 border border-zinc-700 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors font-mono"
-              />
-            </div>
-          </div>
-        </div>
-
         <div className="pt-4 border-t border-zinc-900 flex justify-end">
           <button
             type="submit"
             disabled={isSaving}
-            className="bg-brand-red text-white px-8 py-4 font-bold uppercase tracking-widest text-sm hover:bg-red-600 transition-colors flex items-center gap-2 disabled:opacity-50"
+            className="bg-brand-red text-white px-8 py-4 font-bold uppercase tracking-widest text-sm hover:bg-red-600 transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             {isSaving ? 'Saving...' : 'Save Settings'}
             {!isSaving && <Save className="w-4 h-4" />}

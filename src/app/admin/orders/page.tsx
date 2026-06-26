@@ -5,9 +5,11 @@ import { db } from '@/lib/db';
 import { Order } from '@/types';
 import { Search, ChevronDown } from 'lucide-react';
 import { useToast } from '@/components/ToastContainer';
+import { useRouter } from 'next/navigation';
 
 export default function AdminOrders() {
   const { addToast } = useToast();
+  const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -90,13 +92,17 @@ export default function AdminOrders() {
                   </tr>
                 ) : (
                   filteredOrders.map(order => (
-                    <tr key={order.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-colors">
-                      <td className="p-4 font-mono text-sm text-brand-offwhite">{order.order_number}</td>
+                    <tr 
+                      key={order.id} 
+                      onClick={() => router.push(`/admin/orders/${order.id}`)}
+                      className="border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-colors cursor-pointer"
+                    >
+                      <td className="p-4 font-mono text-sm text-brand-offwhite font-bold">{order.order_number}</td>
                       <td className="p-4 text-sm text-zinc-400">
                         {new Date(order.created_at || Date.now()).toLocaleDateString()}
                       </td>
                       <td className="p-4">
-                        <p className="text-sm text-brand-offwhite">{order.customer_name}</p>
+                        <p className="text-sm text-brand-offwhite font-bold">{order.customer_name}</p>
                         <p className="text-xs text-zinc-500">{order.customer_email}</p>
                       </td>
                       <td className="p-4">
@@ -106,11 +112,14 @@ export default function AdminOrders() {
                           {order.payment_status}
                         </span>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4" onClick={(e) => e.stopPropagation()}>
                         <div className="relative">
                           <select
                             value={order.order_status}
-                            onChange={(e) => handleStatusChange(order.id, e.target.value as Order['order_status'])}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleStatusChange(order.id, e.target.value as Order['order_status']);
+                            }}
                             className={`appearance-none bg-zinc-900 border px-3 py-1.5 pr-8 text-xs font-bold uppercase tracking-wider rounded cursor-pointer focus:outline-none ${
                               order.order_status === 'delivered' ? 'border-green-900 text-green-500' :
                               order.order_status === 'cancelled' ? 'border-red-900 text-red-500' :
@@ -127,7 +136,7 @@ export default function AdminOrders() {
                           <ChevronDown className="w-3 h-3 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500" />
                         </div>
                       </td>
-                      <td className="p-4 font-mono text-sm text-brand-offwhite">₹{order.total.toFixed(2)}</td>
+                      <td className="p-4 font-mono text-sm text-brand-offwhite">₹{(order.total / 100).toFixed(2)}</td>
                     </tr>
                   ))
                 )}

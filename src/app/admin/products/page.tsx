@@ -3,18 +3,20 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '@/lib/db';
 import { Product } from '@/types';
-import { Plus, Edit2, Search, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, CheckCircle2, XCircle } from 'lucide-react';
 import { useToast } from '@/components/ToastContainer';
+import { useRouter } from 'next/navigation';
 
 export default function AdminProducts() {
   const { addToast } = useToast();
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchProducts = async () => {
     try {
-      const data = await db.getProducts();
+      const data = await db.getAllProducts();
       setProducts(data);
     } catch (err) {
       console.error(err);
@@ -39,6 +41,18 @@ export default function AdminProducts() {
     }
   };
 
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete "${name}"?`)) return;
+    try {
+      await db.deleteProduct(id);
+      addToast(`Product "${name}" deleted successfully`, 'success');
+      fetchProducts();
+    } catch (error) {
+      console.error(error);
+      addToast('Failed to delete product', 'error');
+    }
+  };
+
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -52,7 +66,7 @@ export default function AdminProducts() {
           <p className="text-zinc-500 text-sm mt-1">Manage your catalog, stock levels, and pricing.</p>
         </div>
         <button
-          onClick={() => addToast('Add product modal would open here', 'success')}
+          onClick={() => router.push('/admin/products/new')}
           className="bg-brand-red text-white px-6 py-3 font-bold uppercase tracking-widest text-xs hover:bg-red-600 transition-colors flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
@@ -113,9 +127,9 @@ export default function AdminProducts() {
                           </p>
                         </td>
                         <td className="p-4">
-                          <div className="text-sm font-mono text-brand-offwhite">₹{product.price.toFixed(2)}</div>
+                          <div className="text-sm font-mono text-brand-offwhite">₹{(product.price / 100).toFixed(2)}</div>
                           {product.compare_price && (
-                            <div className="text-xs font-mono text-zinc-500 line-through">₹{product.compare_price.toFixed(2)}</div>
+                            <div className="text-xs font-mono text-zinc-500 line-through">₹{(product.compare_price / 100).toFixed(2)}</div>
                           )}
                         </td>
                         <td className="p-4">
@@ -141,13 +155,22 @@ export default function AdminProducts() {
                           </button>
                         </td>
                         <td className="p-4 text-right">
-                          <button
-                            onClick={() => addToast('Edit product modal would open here', 'success')}
-                            className="p-2 text-zinc-400 hover:text-brand-offwhite transition-colors border border-zinc-800 hover:border-zinc-700 rounded bg-zinc-900"
-                            title="Edit Product"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => router.push(`/admin/products/${product.id}/edit`)}
+                              className="p-2 text-zinc-400 hover:text-brand-offwhite transition-colors border border-zinc-800 hover:border-zinc-700 rounded bg-zinc-900"
+                              title="Edit Product"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(product.id, product.name)}
+                              className="p-2 text-zinc-400 hover:text-brand-red transition-colors border border-zinc-800 hover:border-zinc-700 rounded bg-zinc-900"
+                              title="Delete Product"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

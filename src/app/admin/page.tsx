@@ -59,7 +59,7 @@ export default function AdminDashboard() {
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400">Total Revenue</h3>
             <IndianRupee className="w-5 h-5 text-brand-red" />
           </div>
-          <p className="text-3xl font-mono font-bold text-brand-offwhite">₹{totalRevenue.toLocaleString()}</p>
+          <p className="text-3xl font-mono font-bold text-brand-offwhite">₹{(totalRevenue / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
 
         <div className="bg-zinc-900/30 border border-zinc-800 p-6">
@@ -84,7 +84,7 @@ export default function AdminDashboard() {
             <TrendingUp className="w-5 h-5 text-brand-red" />
           </div>
           <p className="text-3xl font-mono font-bold text-brand-offwhite">
-            ₹{totalOrders > 0 ? Math.round(totalRevenue / totalOrders).toLocaleString() : 0}
+            ₹{totalOrders > 0 ? ((totalRevenue / totalOrders) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
           </p>
         </div>
       </div>
@@ -127,7 +127,7 @@ export default function AdminDashboard() {
                           {order.order_status}
                         </span>
                       </td>
-                      <td className="p-4 font-mono text-sm text-brand-offwhite">₹{order.total.toFixed(2)}</td>
+                      <td className="p-4 font-mono text-sm text-brand-offwhite">₹{(order.total / 100).toFixed(2)}</td>
                     </tr>
                   ))
                 )}

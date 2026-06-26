@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, ShoppingBag, PackageSearch, Settings, LogOut, Tag } from 'lucide-react';
-import { supabase } from '@/lib/supabase'; // Import supabase instance
+import { useAuth, useUser, useClerk } from '@clerk/nextjs';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+  { label: 'Categories', href: '/admin/categories', icon: Tag },
   { label: 'Products', href: '/admin/products', icon: PackageSearch },
   { label: 'Orders', href: '/admin/orders', icon: ShoppingBag },
   { label: 'Discounts', href: '/admin/discounts', icon: Tag },
@@ -17,55 +18,40 @@ const NAV_ITEMS = [
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const { isLoaded, userId } = useAuth();
+  const { user } = useUser();
+  const { signOut } = useClerk();
 
-  // Simple client-side mock auth check for now.
-  // In a real production app with Supabase properly configured, this would be handled by middleware.ts
-  // Since we use a local mock fallback in db.ts, we use a simple localStorage token for the mock mode.
   useEffect(() => {
-    const checkAuth = async () => {
-      // Check if we are using the mock DB or real Supabase
-      if (process.env.NEXT_PUBLIC_SUPABASE_URL && supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          setIsAuthenticated(true);
-        } else {
-          router.push('/admin/login');
-        }
-      } else {
-        // Mock Auth Check
-        const token = localStorage.getItem('drftn_admin_token');
-        if (token === 'mock-admin-token') {
-          setIsAuthenticated(true);
-        } else {
-          router.push('/admin/login');
+    if (isLoaded && pathname !== '/admin/login') {
+      if (!userId) {
+        router.push('/admin/login');
+      } else if (user) {
+        const role = user.publicMetadata?.role;
+        if (role !== 'admin') {
+          router.push('/admin/login?error=unauthorized');
         }
       }
-    };
-
-    if (pathname !== '/admin/login') {
-      checkAuth();
-    } else {
-      setIsAuthenticated(true);
     }
-  }, [pathname, router]);
+  }, [isLoaded, userId, user, pathname, router]);
 
   const handleLogout = async () => {
-    if (process.env.NEXT_PUBLIC_SUPABASE_URL && supabase) {
-      await supabase.auth.signOut();
-    } else {
-      localStorage.removeItem('drftn_admin_token');
-    }
+    await signOut();
     router.push('/admin/login');
   };
 
-  if (isAuthenticated === null) {
-    return <div className="min-h-screen bg-brand-black flex items-center justify-center">Loading...</div>;
+  if (!isLoaded && pathname !== '/admin/login') {
+    return <div className="min-h-screen bg-brand-black flex items-center justify-center">Loading Admin Panel...</div>;
   }
 
   // If we are on the login page, just render the children without the sidebar
   if (pathname === '/admin/login') {
     return <div className="min-h-screen bg-brand-black">{children}</div>;
+  }
+
+  // If user metadata is loaded and role is not admin, don't render layout content while redirecting
+  if (user && user.publicMetadata?.role !== 'admin') {
+    return <div className="min-h-screen bg-brand-black flex items-center justify-center text-brand-red font-bold">Redirecting...</div>;
   }
 
   return (
@@ -74,7 +60,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <aside className="w-full md:w-64 bg-zinc-900/50 border-r border-zinc-800 flex-shrink-0 flex flex-col hidden md:flex">
         <div className="p-6 border-b border-zinc-800 flex items-center justify-center">
           <Link href="/" className="text-xl font-extrabold tracking-[0.2em] text-brand-offwhite">
-            DRFTN <span className="text-brand-red font-light text-xs align-top">ADMIN</span>
+            D R F T N <span className="text-brand-red font-light text-xs align-top">ADMIN</span>
           </Link>
         </div>
 
@@ -113,7 +99,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Mobile Header */}
       <div className="md:hidden flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-900/50">
         <Link href="/" className="text-lg font-extrabold tracking-[0.2em] text-brand-offwhite">
-          DRFTN <span className="text-brand-red font-light text-xs align-top">ADMIN</span>
+          D R F T N <span className="text-brand-red font-light text-xs align-top">ADMIN</span>
         </Link>
         <button onClick={handleLogout} className="text-zinc-400 p-2">
           <LogOut className="w-5 h-5" />
@@ -141,7 +127,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-brand-black relative">
+      <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-brand-black relative animate-fade-in">
         {children}
       </main>
     </div>

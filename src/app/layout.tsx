@@ -6,6 +6,7 @@ import MobileNavbar from '@/components/MobileNavbar';
 import MiniCart from '@/components/MiniCart';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import ToastContainer from '@/components/ToastContainer';
+import { ClerkProvider } from '@clerk/nextjs';
 
 export const metadata: Metadata = {
   title: {
@@ -46,25 +47,27 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="antialiased min-h-screen flex flex-col bg-brand-black text-brand-offwhite pb-16 md:pb-0">
-        {/* Global Navbar */}
-        <Navbar />
+    <ClerkProvider afterSignOutUrl="/">
+      <html lang="en">
+        <body className="antialiased min-h-screen flex flex-col bg-brand-black text-brand-offwhite pb-16 md:pb-0">
+          {/* Global Navbar */}
+          <Navbar />
 
-        {/* Main Content Area */}
-        <main className="flex-1 flex flex-col relative w-full">
-          {children}
-        </main>
+          {/* Main Content Area */}
+          <main className="flex-1 flex flex-col relative w-full">
+            {children}
+          </main>
 
-        {/* Global Footer */}
-        <Footer />
+          {/* Global Footer */}
+          <Footer />
 
-        {/* Global Navigation Drawers and Widgets */}
-        <MiniCart />
-        <MobileNavbar />
-        <WhatsAppButton />
-        <ToastContainer />
-      </body>
-    </html>
+          {/* Global Navigation Drawers and Widgets */}
+          <MiniCart />
+          <MobileNavbar />
+          <WhatsAppButton />
+          <ToastContainer />
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

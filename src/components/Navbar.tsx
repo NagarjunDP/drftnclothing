@@ -1,84 +1,198 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, Search, X, Menu } from 'lucide-react';
 import { useCartStore } from '../lib/cartStore';
+import { SignInButton, UserButton, useUser } from '@clerk/nextjs';
+
+const NAV_LINKS = [
+  { href: '/shop', label: 'Collection' },
+  { href: '/about', label: 'About' },
+  { href: '/track', label: 'Track Order' },
+  { href: '/contact', label: 'Contact' },
+];
 
 export default function Navbar() {
   const pathname = usePathname();
+  const { isSignedIn, isLoaded } = useUser();
   const getCartCount = useCartStore((state) => state.getCartCount);
   const setIsOpen = useCartStore((state) => state.setIsOpen);
   const cartCount = getCartCount();
 
-  // Hide standard navbar inside admin section for clean admin layouts
-  const isAdminPage = pathname?.startsWith('/admin');
+  const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [atTop, setAtTop] = useState(true);
+  const lastScrollY = useRef(0);
+  const [hideNav, setHideNav] = useState(false);
 
+  useEffect(() => {
+    const handleScroll = () => {
+      const y = window.scrollY;
+      setScrolled(y > 20);
+      setAtTop(y < 5);
+      // Hide on scroll down, show on scroll up
+      if (y > lastScrollY.current && y > 80) {
+        setHideNav(true);
+      } else {
+        setHideNav(false);
+      }
+      lastScrollY.current = y;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const isAdminPage = pathname?.startsWith('/admin');
   if (isAdminPage) return null;
 
   return (
-    <header className="w-full z-40 relative">
-      {/* Announcement Bar */}
-      <div className="bg-brand-red text-brand-offwhite text-xs font-semibold py-2 px-4 text-center tracking-wider uppercase select-none">
-        Free shipping above ₹999 | COD Available | Bengaluru&apos;s Own Streetwear
+    <>
+      {/* ── Announcement Bar ── */}
+      <div className="bg-brand-charcoal border-b border-brand-muted/30 text-brand-silver text-[10px] font-medium py-2.5 px-6 text-center tracking-[0.2em] uppercase select-none overflow-hidden">
+        <div className="marquee-track pointer-events-none">
+          {[...Array(3)].map((_, i) => (
+            <span key={i} className="flex items-center gap-8 mr-8">
+              <span>Free Shipping Above ₹999</span>
+              <span className="text-brand-gold">◆</span>
+              <span>COD Available Across India</span>
+              <span className="text-brand-gold">◆</span>
+              <span>Born in Yelahanka · Built for the World</span>
+              <span className="text-brand-gold">◆</span>
+              <span>Premium D2C Streetwear</span>
+              <span className="text-brand-gold">◆</span>
+            </span>
+          ))}
+        </div>
       </div>
 
-      {/* Main Glass Nav */}
-      <nav className="w-full sticky top-0 glass-nav py-4 px-6 md:px-12 flex items-center justify-between z-30">
-        {/* Nav Links - Desktop */}
-        <div className="hidden md:flex items-center gap-8 text-sm uppercase tracking-widest font-medium">
-          <Link
-            href="/shop"
-            className={`hover:text-brand-red transition-colors ${
-              pathname === '/shop' ? 'text-brand-red font-bold' : 'text-brand-offwhite/85'
-            }`}
-          >
-            Shop
-          </Link>
-          <Link
-            href="/about"
-            className={`hover:text-brand-red transition-colors ${
-              pathname === '/about' ? 'text-brand-red font-bold' : 'text-brand-offwhite/85'
-            }`}
-          >
-            About
-          </Link>
-          <Link
-            href="/contact"
-            className={`hover:text-brand-red transition-colors ${
-              pathname === '/contact' ? 'text-brand-red font-bold' : 'text-brand-offwhite/85'
-            }`}
-          >
-            Contact
-          </Link>
-        </div>
+      {/* ── Main Navigation ── */}
+      <header
+        className={`w-full sticky top-0 z-50 transition-all duration-500 ${scrolled ? 'glass-nav shadow-2xl shadow-black/40' : 'bg-transparent border-b border-transparent'
+          } ${hideNav ? '-translate-y-full' : 'translate-y-0'}`}
+      >
+        <nav className="max-w-screen-2xl mx-auto px-6 md:px-12 py-4 flex items-center justify-between">
 
-        {/* DRFTN Logo */}
-        <Link
-          href="/"
-          className="text-2xl md:text-3xl font-extrabold tracking-[0.3em] text-brand-offwhite hover:opacity-90 transition-opacity flex items-center select-none"
+          {/* ── Left: Nav Links (Desktop) ── */}
+          <div className="hidden lg:flex items-center gap-10">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`text-[11px] font-medium tracking-[0.18em] uppercase transition-colors duration-200 border-animate pb-0.5 ${pathname === link.href || pathname?.startsWith(link.href + '?')
+                    ? 'text-brand-offwhite'
+                    : 'text-brand-silver hover:text-brand-offwhite'
+                  }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+
+          {/* ── Center: Logo ── */}
+          <Link
+            href="/"
+            className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center select-none group"
+            aria-label="DRFTN Home"
+          >
+            <span
+              className="font-display text-xl md:text-2xl font-bold tracking-[0.45em] text-brand-offwhite group-hover:text-brand-cream transition-colors duration-300"
+              style={{ fontFamily: "'Playfair Display', serif", letterSpacing: '0.4em' }}
+            >
+              DRFTN
+            </span>
+            <span className="text-[8px] font-body tracking-[0.3em] text-brand-gold uppercase font-medium mt-[-2px]">
+              Clothing
+            </span>
+          </Link>
+
+          {/* ── Right: Actions ── */}
+          <div className="flex items-center gap-5 ml-auto">
+            {/* Auth */}
+            <div className="flex items-center">
+              {isLoaded && !isSignedIn && (
+                <SignInButton mode="modal">
+                  <button
+                    id="navbar-login-btn"
+                    className="text-[10px] font-semibold tracking-[0.2em] uppercase text-brand-silver hover:text-brand-offwhite transition-colors duration-200"
+                  >
+                    Sign In
+                  </button>
+                </SignInButton>
+              )}
+              {isLoaded && isSignedIn && (
+                <UserButton
+                  appearance={{
+                    elements: {
+                      userButtonAvatarBox:
+                        'w-7 h-7 border border-brand-muted hover:border-brand-gold transition-colors rounded-full',
+                    },
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="hidden md:block w-px h-4 bg-brand-muted/60" />
+
+            {/* Cart */}
+            <button
+              id="navbar-cart-btn"
+              onClick={() => setIsOpen(true)}
+              className="relative flex items-center text-brand-silver hover:text-brand-offwhite transition-colors duration-200 group"
+              aria-label="Open Cart"
+            >
+              <ShoppingBag className="w-5 h-5 stroke-[1.5]" />
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-brand-red text-brand-offwhite text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-scale-in">
+                  {cartCount}
+                </span>
+              )}
+            </button>
+
+            {/* Mobile Menu Toggle */}
+            <button
+              id="navbar-mobile-menu-btn"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden text-brand-silver hover:text-brand-offwhite transition-colors"
+              aria-label="Toggle Menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
+        </nav>
+
+        {/* ── Mobile Menu Dropdown ── */}
+        <div
+          className={`lg:hidden overflow-hidden transition-all duration-500 ease-in-out ${mobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+            } glass-panel border-t border-brand-muted/20`}
         >
-          D R F T N
-        </Link>
-
-        {/* Right side icons */}
-        <div className="flex items-center gap-6">
-          {/* Cart Trigger */}
-          <button
-            onClick={() => setIsOpen(true)}
-            className="relative p-2 text-brand-offwhite hover:text-brand-red transition-colors group"
-            aria-label="Open Cart"
-          >
-            <ShoppingBag className="w-6 h-6 stroke-[1.5]" />
-            {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-brand-red text-brand-offwhite text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-brand-black animate-scale-in">
-                {cartCount}
-              </span>
-            )}
-          </button>
+          <div className="px-6 py-6 flex flex-col gap-5">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`text-sm tracking-[0.15em] uppercase font-medium transition-colors ${pathname === link.href ? 'text-brand-offwhite' : 'text-brand-silver hover:text-brand-offwhite'
+                  }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <div className="border-t border-brand-muted/30 pt-4 mt-1">
+              {isLoaded && !isSignedIn && (
+                <SignInButton mode="modal">
+                  <button className="text-sm tracking-[0.15em] uppercase font-medium text-brand-gold">
+                    Sign In / Register
+                  </button>
+                </SignInButton>
+              )}
+            </div>
+          </div>
         </div>
-      </nav>
-    </header>
+      </header>
+    </>
   );
 }

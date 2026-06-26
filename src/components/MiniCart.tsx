@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { X, Plus, Minus, Trash2, ShoppingCart } from 'lucide-react';
+import { X, Plus, Minus, Trash2, ShoppingCart, Tag } from 'lucide-react';
 import { useCartStore } from '../lib/cartStore';
+import { toast } from '@/lib/toast';
 
 export default function MiniCart() {
   const items = useCartStore((state) => state.items);
@@ -12,7 +13,63 @@ export default function MiniCart() {
   const updateQuantity = useCartStore((state) => state.updateQuantity);
   const removeItem = useCartStore((state) => state.removeItem);
   const getCartTotal = useCartStore((state) => state.getCartTotal);
+  const discountCode = useCartStore((state) => state.discountCode);
+  const applyDiscount = useCartStore((state) => state.applyDiscount);
+
+  const [promoInput, setPromoInput] = useState('');
   
+  const subtotal = getCartTotal();
+  
+  let discountAmount = 0;
+  if (discountCode) {
+    if (discountCode.discount_type === 'percent') {
+      discountAmount = Math.round(subtotal * (discountCode.discount_value / 100));
+    } else {
+      discountAmount = discountCode.discount_value;
+    }
+  }
+
+  const finalTotal = Math.max(0, subtotal - discountAmount);
+
+  const handleApplyPromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!promoInput.trim()) return;
+
+    try {
+      const res = await fetch('/api/discount/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: promoInput, subtotal }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        toast.error(data.message || 'Invalid promo code!');
+        return;
+      }
+
+      applyDiscount({
+        id: 'applied-coupon',
+        code: promoInput.toUpperCase().trim(),
+        discount_type: data.discount_type,
+        discount_value: data.discount_value,
+        min_order_value: 0,
+        used_count: 0,
+        is_active: true
+      });
+      toast.success(data.message || `Promo code applied successfully!`);
+      setPromoInput('');
+    } catch (err) {
+      toast.error('Error applying coupon.');
+      console.error(err);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    applyDiscount(null);
+    toast.info('Promo code removed.');
+  };
+
   const drawerRef = useRef<HTMLDivElement>(null);
 
   // Prevent background scroll when cart is open
@@ -41,17 +98,15 @@ export default function MiniCart() {
       {/* Dimmed Backdrop */}
       <div
         onClick={() => setIsOpen(false)}
-        className={`fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${
-          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
+        className={`fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
       />
 
       {/* Cart Drawer */}
       <div
         ref={drawerRef}
-        className={`fixed top-0 right-0 h-full w-full max-w-md z-50 bg-brand-black border-l border-zinc-900 shadow-2xl flex flex-col transition-transform duration-300 ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
+        className={`fixed top-0 right-0 h-full w-full max-w-md z-50 bg-brand-black border-l border-zinc-900 shadow-2xl flex flex-col transition-transform duration-300 ${isOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
       >
         {/* Header */}
         <div className="p-6 border-b border-zinc-900 flex items-center justify-between">
@@ -107,7 +162,7 @@ export default function MiniCart() {
                         {item.name}
                       </h4>
                       <p className="text-sm font-bold text-brand-offwhite ml-2">
-                        ₹{item.price * item.quantity}
+                        ₹{((item.price * item.quantity) / 100).toFixed(2)}
                       </p>
                     </div>
                     <p className="text-xs text-zinc-500 font-medium uppercase mt-0.5">SIZE: {item.size}</p>
@@ -152,12 +207,55 @@ export default function MiniCart() {
 
         {/* Footer */}
         {items.length > 0 && (
-          <div className="p-6 border-t border-zinc-900 bg-zinc-950/60">
-            <div className="flex justify-between items-center mb-6">
-              <span className="text-xs uppercase tracking-widest text-zinc-500 font-bold">Estimated Subtotal</span>
-              <span className="text-lg font-extrabold text-brand-offwhite">₹{getCartTotal()}</span>
-            </div>
+          <div className="p-6 border-t border-zinc-900 bg-zinc-950/60 space-y-4">
             
+            {/* Promo code box */}
+            <div className="space-y-2 mb-2">
+              <form onSubmit={handleApplyPromo} className="flex gap-2">
+                <input
+                  type="text"
+                  value={promoInput}
+                  onChange={(e) => setPromoInput(e.target.value)}
+                  placeholder="Promo Code"
+                  className="flex-1 bg-zinc-900 border border-zinc-800 text-brand-offwhite py-2 px-3 text-xs rounded uppercase font-bold tracking-wider"
+                />
+                <button
+                  type="submit"
+                  className="bg-brand-offwhite text-brand-black hover:bg-brand-red hover:text-brand-offwhite font-bold text-xs uppercase tracking-wider py-2 px-3 rounded transition-colors"
+                >
+                  Apply
+                </button>
+              </form>
+              
+              {discountCode && (
+                <div className="flex justify-between items-center text-emerald-400 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <Tag className="w-3 h-3" />
+                    <span className="uppercase font-bold">{discountCode.code}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold">-₹{(discountAmount / 100).toFixed(2)}</span>
+                    <button
+                      onClick={handleRemovePromo}
+                      className="text-zinc-500 hover:text-brand-red text-[10px] uppercase font-bold tracking-widest border border-zinc-800 rounded px-1.5 py-0.5"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center text-xs text-zinc-400">
+              <span className="uppercase tracking-widest font-bold">Subtotal</span>
+              <span className="font-mono">₹{(subtotal / 100).toFixed(2)}</span>
+            </div>
+
+            <div className="flex justify-between items-center mb-6 pt-2 border-t border-zinc-800">
+              <span className="text-sm uppercase tracking-widest text-zinc-300 font-bold">Estimated Total</span>
+              <span className="text-lg font-extrabold text-brand-offwhite">₹{(finalTotal / 100).toFixed(2)}</span>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <Link
                 href="/cart"
@@ -174,7 +272,7 @@ export default function MiniCart() {
                 Checkout
               </Link>
             </div>
-            
+
             <p className="text-[10px] text-zinc-600 text-center mt-4">
               Shipping & taxes calculated at checkout.
             </p>
