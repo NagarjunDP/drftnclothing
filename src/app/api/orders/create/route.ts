@@ -5,9 +5,19 @@ import { eq, and, inArray, count, sql } from 'drizzle-orm';
 import { createOrderSchema } from '@/lib/validations';
 import { razorpay } from '@/lib/razorpay';
 import { z } from 'zod';
+import { auth } from '@clerk/nextjs/server';
 
 export async function POST(request: Request) {
   try {
+    // 0. Verify authentication
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized: You must be signed in to place an order.' },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
 
     // 1. Zod input validation

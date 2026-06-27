@@ -1,9 +1,14 @@
 'use client';
 
 import React from 'react';
-
+import { usePathname } from 'next/navigation';
 
 export default function WhatsAppButton() {
+  const pathname = usePathname();
+  const isExcluded = pathname?.startsWith('/admin') || pathname === '/checkout';
+
+  if (isExcluded) return null;
+
   return (
     <a
       href="https://wa.me/917406164512?text=Hey%20DRFTN%20CLOTHING!%20I'm%20interested%20in%20your%20streetwear%20collection."

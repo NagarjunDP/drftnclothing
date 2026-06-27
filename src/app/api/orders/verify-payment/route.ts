@@ -4,6 +4,7 @@ import { db } from '@/db';
 import * as schema from '@/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { verifyPaymentSchema } from '@/lib/validations';
+import { auth } from '@clerk/nextjs/server';
 
 const MAKE_WHATSAPP_WEBHOOK = process.env.MAKE_WEBHOOK_URL || '';
 
@@ -11,6 +12,14 @@ export async function POST(request: Request) {
   const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
 
   try {
+    // 0. Verify authentication
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Unauthorized: You must be signed in to verify payment.' },
+        { status: 401 }
+      );
+    }
     const body = await request.json();
 
     // 1. Zod input validation

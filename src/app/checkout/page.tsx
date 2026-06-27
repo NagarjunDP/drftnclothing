@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { useCartStore } from '@/lib/cartStore';
 import { ChevronLeft, Lock, CheckCircle, Package, ArrowRight } from 'lucide-react';
 import { useToast } from '@/components/ToastContainer';
+import { SignInButton, useUser } from '@clerk/nextjs';
 
 export default function CheckoutPage() {
   const { items, getCartTotal, discountCode, clearCart } = useCartStore();
   const { addToast } = useToast();
+  const { isSignedIn, isLoaded, user } = useUser();
   
   const [mounted, setMounted] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -61,6 +63,17 @@ export default function CheckoutPage() {
     };
     fetchConfig();
   }, []);
+
+  // Pre-fill user data from Clerk on login
+  useEffect(() => {
+    if (isLoaded && isSignedIn && user) {
+      setFormData((prev) => ({
+        ...prev,
+        name: prev.name || user.fullName || '',
+        email: prev.email || user.primaryEmailAddress?.emailAddress || '',
+      }));
+    }
+  }, [isLoaded, isSignedIn, user]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -283,7 +296,39 @@ export default function CheckoutPage() {
     }
   };
 
-  if (!mounted) return <div className="min-h-screen bg-brand-black" />;
+  if (!mounted || !isLoaded) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center bg-brand-black text-zinc-500 font-bold uppercase tracking-widest text-xs">
+        Loading Secure Checkout...
+      </div>
+    );
+  }
+
+  if (!isSignedIn) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center bg-brand-black text-brand-offwhite animate-fade-in">
+        <div className="w-20 h-20 bg-brand-red/10 border border-brand-red/20 rounded-full flex items-center justify-center mb-6">
+          <Lock className="w-8 h-8 text-brand-red animate-pulse" />
+        </div>
+        <h1 className="text-2xl md:text-3xl font-extrabold tracking-widest text-brand-offwhite mb-4 uppercase">
+          Authentication Required
+        </h1>
+        <p className="text-zinc-550 mb-8 max-w-sm mx-auto text-xs leading-relaxed uppercase tracking-wider">
+          Please sign in to place your order. Accounts allow secure tracking and easy checkout.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <SignInButton mode="modal">
+            <button className="bg-brand-red text-white px-8 py-3.5 font-bold uppercase tracking-widest text-xs hover:bg-red-600 transition-colors cursor-pointer border border-brand-red">
+              Sign In to Continue
+            </button>
+          </SignInButton>
+          <Link href="/shop" className="bg-transparent border border-zinc-700 text-brand-offwhite px-8 py-3.5 font-bold uppercase tracking-widest text-xs hover:bg-zinc-800 transition-colors">
+            Back to Shop
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (currentStep === 3 && successOrderInfo) {
     return (

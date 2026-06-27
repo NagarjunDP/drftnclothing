@@ -212,7 +212,7 @@ export default function Homepage() {
         {/* Background Image */}
         <div className="absolute inset-0">
           <img
-            src="https://images.unsplash.com/photo-1509281373149-e957c6296406?w=1800&auto=format&fit=crop&q=85&sat=-30"
+            src="/hero-clothing.png"
             alt="DRFTN Hero"
             className={`w-full h-full object-cover object-center transition-opacity duration-1000 ${heroImageLoaded ? 'opacity-100' : 'opacity-0'}`}
             onLoad={() => setHeroImageLoaded(true)}
