@@ -612,7 +612,7 @@ export default function Homepage() {
             {[
               'https://images.unsplash.com/photo-1509281373149-e957c6296406?w=500',
               'https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=500',
-              'https://images.unsplash.com/photo-1607990283143-e81e7a2c93ab?w=500',
+              'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=500',
               'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=500',
               'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500',
               'https://images.unsplash.com/photo-1534215754734-18e55d13e346?w=500',
