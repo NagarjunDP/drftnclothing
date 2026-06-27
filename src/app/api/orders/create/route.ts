@@ -13,6 +13,7 @@ export async function POST(request: Request) {
     // 1. Zod input validation
     const validationResult = createOrderSchema.safeParse(body);
     if (!validationResult.success) {
+      console.error('Order validation failed:', JSON.stringify(validationResult.error.format(), null, 2));
       return NextResponse.json(
         { error: 'Invalid order input data', details: validationResult.error.format() },
         { status: 400 }
