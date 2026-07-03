@@ -21,7 +21,8 @@ export const products = pgTable('products', {
   description: text('description').notNull(),
   price: integer('price').notNull(), // stored in paise, e.g. 129900 for ₹1299
   compare_price: integer('compare_price'), // strikethrough MRP in paise
-  category: text('category').notNull(), // 'tees' | 'hoodies' | 'joggers' | 'accessories'
+  category: text('category').notNull(), // main category slug, e.g. 't-shirts'
+  subcategory: text('subcategory'), // subcategory slug, e.g. 'boxy-fit-t-shirts'
   gender: text('gender').notNull(), // 'unisex' | 'men' | 'women'
   images: text('images').array().notNull().default(sql`'{}'::text[]`), // Array of Cloudinary URLs
   sizes: text('sizes').array().notNull().default(sql`'{"XS", "S", "M", "L", "XL", "XXL"}'::text[]`),

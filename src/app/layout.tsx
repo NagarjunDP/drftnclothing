@@ -6,6 +6,8 @@ import MobileNavbar from '@/components/MobileNavbar';
 import MiniCart from '@/components/MiniCart';
 import WhatsAppButton from '@/components/WhatsAppButton';
 import ToastContainer from '@/components/ToastContainer';
+import AddToCartAnimation from '@/components/AddToCartAnimation';
+import BrandLoader from '@/components/BrandLoader';
 import { ClerkProvider } from '@clerk/nextjs';
 
 export const metadata: Metadata = {
@@ -66,6 +68,8 @@ export default function RootLayout({
           <MobileNavbar />
           <WhatsAppButton />
           <ToastContainer />
+          <AddToCartAnimation />
+          <BrandLoader />
         </body>
       </html>
     </ClerkProvider>

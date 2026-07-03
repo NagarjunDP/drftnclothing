@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Minus, Trash2, Tag, ShoppingBag, ArrowRight } from 'lucide-react';
+import NextImage from 'next/image';
+import { Plus, Minus, Trash2, Tag, ShoppingBag, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
 import { dbService } from '@/lib/db';
 import { toast } from '@/lib/toast';
@@ -93,83 +94,104 @@ export default function CartPage() {
     toast.info('Promo code removed.');
   };
 
+  // Shipping progress helper
+  const shippingProgress = Math.min((subtotal / freeShippingThreshold) * 100, 100);
+  const amountToFreeShipping = Math.max(0, freeShippingThreshold - subtotal);
+  const hasEarnedFreeShipping = subtotal >= freeShippingThreshold;
+
   if (items.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center text-center py-24 px-6 space-y-6">
-        <div className="p-6 border border-zinc-900 bg-zinc-950/20 rounded-full flex items-center justify-center animate-bounce">
-          <ShoppingBag className="w-16 h-16 text-zinc-700 stroke-[1]" />
+      <div className="flex-1 flex flex-col items-center justify-center text-center py-32 px-6 space-y-8 bg-brand-black" role="status" aria-live="polite">
+        <div className="w-20 h-20 border border-brand-graphite flex items-center justify-center">
+          <ShoppingBag className="w-8 h-8 text-brand-muted stroke-[1]" aria-hidden="true" />
         </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-black uppercase tracking-wider text-brand-offwhite">YOUR BAG IS EMPTY</h2>
-          <p className="text-zinc-500 text-xs max-w-sm mx-auto">
-            You haven&apos;t added any items to your shopping bag yet. Explore the shop to get driftin.
+        <div className="space-y-3">
+          <h1 className="text-2xl font-display uppercase tracking-widest text-brand-offwhite">YOUR BAG IS EMPTY</h1>
+          <p className="text-brand-stone text-xs tracking-wider uppercase max-w-xs mx-auto font-body">
+            You haven&apos;t added any items to your shopping bag yet. Explore the drop to get driftin.
           </p>
         </div>
         <Link
           href="/shop"
-          className="btn-electric bg-brand-offwhite text-brand-black font-extrabold text-xs uppercase tracking-widest py-4 px-8 rounded shadow-lg transition-all duration-300"
+          className="btn-primary"
         >
-          Explore Collection
+          <span>Explore Collection</span>
+          <ArrowRight className="w-3.5 h-3.5 relative z-10" aria-hidden="true" />
         </Link>
       </div>
     );
   }
 
   return (
-    <div className="py-12 px-6 md:px-12 max-w-7xl mx-auto w-full flex-1 flex flex-col">
-      <h1 className="text-3xl md:text-5xl font-black uppercase tracking-wider text-brand-offwhite mb-8 border-b border-zinc-900 pb-6">
-        YOUR BAG
-      </h1>
+    <div className="py-16 px-6 md:px-12 max-w-screen-2xl mx-auto w-full flex-1 flex flex-col bg-brand-black">
+      {/* Page Title */}
+      <div className="border-b border-brand-graphite pb-8 mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <span className="eyebrow mb-3 block">Your Checkout Selection</span>
+          <h1 className="text-brand-offwhite leading-none font-display uppercase" style={{ fontSize: 'clamp(2.4rem, 6vw, 4.5rem)' }}>
+            Your Bag
+          </h1>
+        </div>
+        <p className="text-brand-stone text-[10px] tracking-[0.2em] uppercase font-body font-semibold mb-1">
+          {items.reduce((acc, item) => acc + item.quantity, 0)} Items Added
+        </p>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        {/* Left Column: Cart Items Checklist */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="border border-zinc-900 bg-zinc-950/20 rounded-md overflow-hidden divide-y divide-zinc-900/60">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 lg:gap-14">
+        {/* Left Column: Cart Items List */}
+        <div className="lg:col-span-2 space-y-8">
+          <div className="border border-brand-graphite bg-brand-charcoal/30 divide-y divide-brand-graphite" role="list" aria-label="Shopping bag items">
             {items.map((item) => (
-              <div key={`${item.id}-${item.size}`} className="p-6 flex flex-col sm:flex-row gap-6">
+              <div key={`${item.id}-${item.size}`} className="p-6 flex flex-col sm:flex-row gap-6" role="listitem">
                 {/* Image */}
-                <div className="relative w-24 h-28 bg-zinc-950 rounded-md overflow-hidden flex-shrink-0">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="object-cover w-full h-full filter grayscale hover:filter-none transition-all duration-350"
+                <div className="relative w-24 h-32 bg-brand-graphite overflow-hidden flex-shrink-0">
+                  <NextImage
+                    src={item.image || 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=300'}
+                    alt={`${item.name} — size ${item.size}`}
+                    fill
+                    sizes="96px"
+                    className="object-cover"
                   />
                 </div>
 
-                {/* Info & Quantity controls */}
-                <div className="flex-1 flex flex-col justify-between">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-[10px] text-brand-red font-bold uppercase tracking-widest">
-                        DRFTN STAPLE
+                {/* Details */}
+                <div className="flex-1 flex flex-col justify-between min-w-0">
+                  <div>
+                    <div className="flex justify-between items-start gap-4">
+                      <div>
+                        <span className="text-[9px] text-brand-amber font-semibold uppercase tracking-[0.2em] font-body">
+                          DRFTN STAPLE
+                        </span>
+                        <h3 className="text-sm font-semibold text-brand-offwhite uppercase tracking-wide mt-1 font-body leading-snug">
+                          {item.name}
+                        </h3>
+                        <p className="text-[10px] text-brand-stone font-semibold uppercase tracking-wider mt-1.5 font-body">
+                          Size: {item.size}
+                        </p>
+                      </div>
+                      <span className="text-sm font-bold text-brand-offwhite shrink-0 font-body">
+                        ₹{((item.price * item.quantity) / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
                       </span>
-                      <h3 className="text-base font-bold text-brand-offwhite uppercase tracking-wider mt-0.5">
-                        {item.name}
-                      </h3>
-                      <p className="text-xs text-zinc-500 font-bold uppercase mt-1">SIZE: {item.size}</p>
                     </div>
-                    <span className="text-base font-extrabold text-brand-offwhite">
-                      ₹{((item.price * item.quantity) / 100).toFixed(2)}
-                    </span>
                   </div>
 
-                  <div className="flex items-center justify-between mt-4">
-                    {/* Quantity Selector */}
-                    <div className="flex items-center border border-zinc-800 rounded bg-zinc-950">
+                  <div className="flex items-center justify-between mt-6">
+                    {/* Quantity Controls */}
+                    <div className="flex items-center border border-brand-muted bg-brand-graphite" role="group" aria-label="Quantity controls">
                       <button
                         onClick={() => updateQuantity(item.id, item.size, item.quantity - 1)}
-                        className="p-2 text-zinc-500 hover:text-brand-offwhite transition-colors"
-                        aria-label="Decrease quantity"
+                        className="w-8 h-8 flex items-center justify-center text-brand-stone hover:text-brand-offwhite transition-colors"
+                        aria-label={`Decrease quantity of ${item.name}`}
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
-                      <span className="text-xs px-3 text-brand-offwhite font-bold w-8 text-center select-none">
+                      <span className="text-xs px-3 text-brand-offwhite font-bold w-8 text-center select-none font-body">
                         {item.quantity}
                       </span>
                       <button
                         onClick={() => updateQuantity(item.id, item.size, item.quantity + 1)}
-                        className="p-2 text-zinc-500 hover:text-brand-offwhite transition-colors"
-                        aria-label="Increase quantity"
+                        className="w-8 h-8 flex items-center justify-center text-brand-stone hover:text-brand-offwhite transition-colors"
+                        aria-label={`Increase quantity of ${item.name}`}
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
@@ -181,7 +203,8 @@ export default function CartPage() {
                         removeItem(item.id, item.size);
                         toast.info(`Removed ${item.name} from bag.`);
                       }}
-                      className="text-zinc-600 hover:text-brand-red transition-colors flex items-center gap-1 text-xs uppercase tracking-widest font-bold"
+                      className="text-brand-stone hover:text-brand-red transition-colors flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold"
+                      aria-label={`Remove ${item.name} from bag`}
                     >
                       <Trash2 className="w-4 h-4" />
                       <span className="hidden sm:inline">Remove</span>
@@ -196,39 +219,70 @@ export default function CartPage() {
           <div className="text-left">
             <Link
               href="/shop"
-              className="text-xs uppercase tracking-widest text-zinc-500 hover:text-brand-offwhite font-extrabold transition-colors"
+              className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-brand-stone hover:text-brand-offwhite font-bold transition-colors border-animate pb-0.5"
             >
-              &larr; Continue Shopping
+              <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+              Continue Shopping
             </Link>
           </div>
         </div>
 
-        {/* Right Column: Order Summary & Discount code */}
-        <div className="space-y-6">
-          <div className="border border-zinc-900 bg-zinc-950/40 rounded-md p-6 glass-panel space-y-6">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-brand-offwhite border-b border-zinc-900 pb-4">
-              ORDER SUMMARY
-            </h3>
+        {/* Right Column: Order Summary & Discount Code */}
+        <div className="space-y-8">
+          <div className="border border-brand-graphite bg-brand-charcoal/30 p-6 space-y-6">
+            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-brand-offwhite border-b border-brand-graphite pb-4 font-display">
+              Order Summary
+            </h2>
+
+            {/* Free Shipping Progress bar in Order Summary */}
+            {!loadingSettings && (
+              <div className="space-y-2 pb-2">
+                {hasEarnedFreeShipping ? (
+                  <p className="text-[10px] tracking-[0.2em] uppercase font-bold text-brand-amber font-body">
+                    ✓ Free Shipping Unlocked!
+                  </p>
+                ) : (
+                  <p className="text-[10px] tracking-[0.15em] uppercase font-body font-medium text-brand-stone">
+                    Add <span className="text-brand-offwhite font-bold">
+                      ₹{(amountToFreeShipping / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                    </span> more for free shipping
+                  </p>
+                )}
+                <div className="shipping-progress-bar">
+                  <div
+                    className="shipping-progress-fill"
+                    style={{ width: `${shippingProgress}%` }}
+                    role="progressbar"
+                    aria-valuenow={shippingProgress}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Calculations lines */}
-            <div className="space-y-3.5 text-xs">
-              <div className="flex justify-between items-center text-zinc-500">
+            <div className="space-y-4 text-xs font-body">
+              <div className="flex justify-between items-center text-brand-stone">
                 <span>Bag Subtotal</span>
-                <span className="font-semibold text-brand-offwhite">₹{(subtotal / 100).toFixed(2)}</span>
+                <span className="font-semibold text-brand-offwhite">
+                  ₹{(subtotal / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                </span>
               </div>
 
               {/* Promo code line */}
               {discountCode && (
                 <div className="flex justify-between items-center text-emerald-400">
                   <div className="flex items-center gap-1.5">
-                    <Tag className="w-3.5 h-3.5" />
-                    <span className="uppercase font-bold">VOUCHER: {discountCode.code}</span>
+                    <Tag className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span className="uppercase font-bold tracking-wider">{discountCode.code}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-bold">-₹{(discountAmount / 100).toFixed(2)}</span>
+                    <span className="font-bold">−₹{(discountAmount / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}</span>
                     <button
                       onClick={handleRemovePromo}
-                      className="text-zinc-500 hover:text-brand-red text-[10px] uppercase font-bold tracking-widest border border-zinc-800 rounded px-1.5 py-0.5"
+                      className="text-brand-stone hover:text-brand-red text-[9px] uppercase font-bold tracking-widest transition-colors"
+                      aria-label="Remove promo code"
                     >
                       Remove
                     </button>
@@ -236,66 +290,64 @@ export default function CartPage() {
                 </div>
               )}
 
-              <div className="flex justify-between items-center text-zinc-500">
+              <div className="flex justify-between items-center text-brand-stone">
                 <span>Shipping Fee</span>
                 {shippingCharge === 0 ? (
                   <span className="font-extrabold text-emerald-400 uppercase tracking-widest text-[10px]">
                     FREE
                   </span>
                 ) : (
-                  <span className="font-semibold text-brand-offwhite">₹{(shippingCharge / 100).toFixed(2)}</span>
+                  <span className="font-semibold text-brand-offwhite">
+                    ₹{(shippingCharge / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                  </span>
                 )}
               </div>
-
-              {/* Threshold indicator */}
-              {shippingCharge > 0 && !loadingSettings && (
-                <p className="text-[10px] text-zinc-500 bg-zinc-950 p-2.5 rounded leading-relaxed border border-zinc-900">
-                  Add <strong className="text-brand-offwhite">₹{((freeShippingThreshold - subtotal) / 100).toFixed(2)}</strong> more to your bag to unlock <strong className="text-emerald-400">FREE SHIPPING</strong>.
-                </p>
-              )}
             </div>
 
-            <div className="border-t border-zinc-900 my-4"></div>
+            <div className="border-t border-brand-graphite"></div>
 
             {/* Total line */}
-            <div className="flex justify-between items-center text-sm font-bold uppercase tracking-wider">
-              <span className="text-brand-offwhite">Estimated Total</span>
-              <span className="text-xl font-extrabold text-brand-offwhite">₹{(finalTotal / 100).toFixed(2)}</span>
+            <div className="flex justify-between items-center">
+              <span className="text-xs uppercase tracking-[0.2em] text-brand-stone font-body font-semibold">Estimated Total</span>
+              <span className="text-lg font-extrabold text-brand-offwhite font-display">
+                ₹{(finalTotal / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+              </span>
             </div>
 
             {/* Proceed CTA */}
             <Link
               href="/checkout"
-              className="btn-electric w-full flex items-center justify-center gap-2 bg-brand-red hover:bg-brand-red/90 text-brand-offwhite font-bold text-xs uppercase tracking-widest py-4 px-6 rounded-md shadow-lg shadow-brand-red/25 transition-all duration-300"
+              className="btn-electric w-full text-center bg-brand-offwhite text-brand-black hover:bg-brand-red hover:text-brand-offwhite font-bold text-xs uppercase tracking-widest py-4 px-6 transition-all duration-300 relative"
             >
-              PROCEED TO CHECKOUT
-              <ArrowRight className="w-4 h-4" />
+              <span>Proceed to Checkout</span>
             </Link>
           </div>
 
           {/* Promo code box */}
-          <div className="border border-zinc-900 bg-zinc-950/20 rounded-md p-6 space-y-4">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-              <Tag className="w-3.5 h-3.5 text-brand-red" />
+          <div className="border border-brand-graphite bg-brand-charcoal/20 p-6 space-y-4">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-brand-stone flex items-center gap-2">
+              <Tag className="w-3.5 h-3.5 text-brand-stone" aria-hidden="true" />
               Apply Promo Code
-            </h4>
-            <form onSubmit={handleApplyPromo} className="flex gap-2">
+            </h3>
+            <form onSubmit={handleApplyPromo} className="flex gap-2" aria-label="Apply promo code">
+              <label htmlFor="cart-promo-input" className="sr-only">Promo code</label>
               <input
+                id="cart-promo-input"
                 type="text"
                 value={promoInput}
                 onChange={(e) => setPromoInput(e.target.value)}
                 placeholder="DRFTN10 / BLRSTREET"
-                className="flex-1 bg-zinc-950 border border-zinc-900 text-brand-offwhite py-2.5 px-4 text-xs rounded uppercase font-bold tracking-wider"
+                className="flex-1 bg-brand-graphite border border-brand-muted text-brand-offwhite py-2.5 px-4 text-xs uppercase font-bold tracking-wider"
               />
               <button
                 type="submit"
-                className="bg-brand-offwhite text-brand-black hover:bg-brand-red hover:text-brand-offwhite font-bold text-xs uppercase tracking-wider py-2.5 px-4 rounded transition-colors"
+                className="bg-brand-graphite border border-brand-muted text-brand-offwhite hover:border-brand-amber hover:text-brand-amber font-bold text-xs uppercase tracking-wider py-2.5 px-4 transition-colors"
               >
                 Apply
               </button>
             </form>
-            <p className="text-[9px] text-zinc-600 leading-normal">
-              * Promo codes cannot be combined. Min order values apply. Try codes: <strong className="text-zinc-500">DRFTN10</strong> (10% off) or <strong className="text-zinc-500">BLRSTREET</strong> (₹250 off on orders &gt; ₹1499).
+            <p className="text-[10px] text-brand-stone leading-relaxed font-body font-light">
+              * Promo codes cannot be combined. Min order values apply. Try codes: <strong className="text-brand-stone font-semibold">DRFTN10</strong> (10% off) or <strong className="text-brand-stone font-semibold">BLRSTREET</strong> (₹250 off on orders &gt; ₹1499).
             </p>
           </div>
         </div>

@@ -4,6 +4,8 @@ export interface ToastMessage {
   id: string;
   message: string;
   type: ToastType;
+  productImage?: string;
+  productName?: string;
 }
 
 type ToastSubscriber = (toasts: ToastMessage[]) => void;
@@ -23,16 +25,18 @@ export const toast = {
       subscribers = subscribers.filter((s) => s !== sub);
     };
   },
-  show: (message: string, type: ToastType = 'success') => {
+  show: (message: string, type: ToastType = 'success', extra?: { productImage?: string; productName?: string }) => {
     const id = Math.random().toString(36).substring(2, 9);
-    toasts = [...toasts, { id, message, type }];
+    toasts = [...toasts, { id, message, type, ...extra }];
     notify();
     setTimeout(() => {
       toasts = toasts.filter((t) => t.id !== id);
       notify();
-    }, 3000);
+    }, 2500); // 2.5 second auto-dismiss
   },
   success: (message: string) => toast.show(message, 'success'),
   error: (message: string) => toast.show(message, 'error'),
   info: (message: string) => toast.show(message, 'info'),
+  cartSuccess: (productName: string, productImage: string) =>
+    toast.show(`Added ${productName} to bag`, 'success', { productName, productImage }),
 };

@@ -2,11 +2,13 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, Plus, Minus, ShoppingBag, CreditCard, Ruler, Info, X } from 'lucide-react';
 import { dbService } from '@/lib/db';
 import { Product } from '@/types';
 import { useCartStore } from '@/lib/cartStore';
+import { useAnimationStore } from '@/lib/animationStore';
 import { toast } from '@/lib/toast';
 import { ProductDetailSkeleton } from '@/components/Skeletons';
 
@@ -23,12 +25,13 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   const [product, setProduct] = useState<Product | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  
+  const [isAdding, setIsAdding] = useState(false);
+
   // Gallery & Detail State
   const [activeImage, setActiveImage] = useState<string>('');
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
-  const [activeTab, setActiveTab] = useState<'details' | 'shipping' | 'returns'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'shipping' | 'returns' | ''>('details');
   const [sizeChartOpen, setSizeChartOpen] = useState<boolean>(false);
 
   // Cart operations
@@ -93,7 +96,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     return product.stock_quantity[size] || 0;
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (e: React.MouseEvent) => {
     if (!selectedSize) {
       toast.error('Please select a size first!');
       return;
@@ -105,6 +108,9 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       return;
     }
 
+    setIsAdding(true);
+    setTimeout(() => setIsAdding(false), 900);
+
     addItem({
       id: product.id,
       name: product.name,
@@ -115,7 +121,34 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       size: selectedSize,
     }, quantity);
 
-    toast.success(`Added ${quantity} x ${product.name} (Size ${selectedSize}) to bag!`);
+    // Trigger the flying image animation
+    let cartEl = document.getElementById('navbar-cart-btn');
+    if (!cartEl || cartEl.getBoundingClientRect().width === 0) {
+      cartEl = document.getElementById('mobile-cart-trigger');
+    }
+
+    if (cartEl) {
+      const cartRect = cartEl.getBoundingClientRect();
+      const endX = cartRect.left + cartRect.width / 2;
+      const endY = cartRect.top + cartRect.height / 2;
+
+      // Find the main product image coordinates
+      const imgEl = document.querySelector('.pdp-main-image img') || document.querySelector('img');
+      const sourceRect = imgEl ? imgEl.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
+
+      const startX = sourceRect.left + sourceRect.width / 2;
+      const startY = sourceRect.top + sourceRect.height / 2;
+
+      useAnimationStore.getState().addFlyingItem({
+        imageUrl: product.images[0] || '',
+        start: { x: startX, y: startY },
+        end: { x: endX, y: endY },
+      });
+    } else {
+      useAnimationStore.getState().triggerCartPulse();
+    }
+
+    toast.cartSuccess(product.name, product.images[0] || '');
   };
 
   const handleBuyNow = () => {
@@ -159,7 +192,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         {/* Left: Image Gallery */}
         <div className="space-y-4">
           {/* Main frame */}
-          <div className="aspect-[3/4] bg-zinc-950 rounded-md overflow-hidden border border-zinc-900/60 relative group">
+          <div className="pdp-main-image aspect-[3/4] bg-zinc-950 rounded-none overflow-hidden border border-zinc-900/60 relative group">
             <img
               src={activeImage}
               alt={product.name}
@@ -178,9 +211,8 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                 <button
                   key={idx}
                   onClick={() => setActiveImage(img)}
-                  className={`aspect-square bg-zinc-950 rounded border overflow-hidden transition-all ${
-                    activeImage === img ? 'border-brand-red' : 'border-zinc-900/60 hover:border-zinc-700'
-                  }`}
+                  className={`aspect-square bg-zinc-950 rounded border overflow-hidden transition-all ${activeImage === img ? 'border-brand-red' : 'border-zinc-900/60 hover:border-zinc-700'
+                    }`}
                 >
                   <img src={img} alt={`Thumbnail ${idx}`} className="w-full h-full object-cover filter grayscale hover:filter-none" />
                 </button>
@@ -194,14 +226,14 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           <div className="space-y-4">
             <div>
               <span className="text-xs text-brand-red font-bold uppercase tracking-[0.2em]">{product.category}</span>
-              <h1 className="text-3xl md:text-4xl font-extrabold uppercase tracking-wide text-brand-offwhite mt-1">
+              <h1 className="text-3xl md:text-4xl font-display uppercase tracking-wider text-brand-offwhite mt-1">
                 {product.name}
               </h1>
             </div>
 
             {/* Pricing */}
             <div className="flex items-center gap-3">
-              <span className="text-xl md:text-2xl font-black text-brand-offwhite">₹{(product.price / 100).toFixed(2)}</span>
+              <span className="text-xl md:text-2xl font-bold text-brand-offwhite">₹{(product.price / 100).toFixed(2)}</span>
               {product.compare_price && (
                 <span className="text-sm md:text-base text-zinc-500 line-through">₹{(product.compare_price / 100).toFixed(2)}</span>
               )}
@@ -240,17 +272,16 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                         setSelectedSize(size);
                         setQuantity(1);
                       }}
-                      className={`min-w-[3rem] h-12 px-3 text-xs border uppercase font-extrabold flex items-center justify-center rounded transition-all relative ${
-                        isOutOfStock
+                      className={`min-w-[3rem] h-12 px-3 text-xs border uppercase font-bold flex items-center justify-center rounded-none transition-all relative ${isOutOfStock
                           ? 'border-zinc-900 text-zinc-700 bg-zinc-950 cursor-not-allowed line-through'
                           : selectedSize === size
-                          ? 'border-brand-red bg-brand-red text-brand-offwhite shadow-lg shadow-brand-red/10'
-                          : 'border-zinc-800 text-brand-offwhite hover:border-zinc-500'
-                      }`}
+                            ? 'border-brand-red bg-brand-red text-brand-offwhite'
+                            : 'border-zinc-800 text-brand-offwhite hover:border-zinc-500'
+                        }`}
                     >
                       {size}
                       {stock > 0 && stock <= 3 && (
-                        <span className="absolute -top-1.5 -right-1 bg-brand-red text-[8px] text-brand-offwhite px-1 rounded scale-90">
+                        <span className="absolute -top-1.5 -right-1 bg-brand-red text-[8px] text-brand-offwhite px-1 rounded-none scale-90">
                           {stock}
                         </span>
                       )}
@@ -264,7 +295,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             {selectedSize && (
               <div className="space-y-2">
                 <span className="text-xs font-bold uppercase tracking-widest text-zinc-400">Quantity</span>
-                <div className="flex items-center border border-zinc-800 rounded bg-zinc-950 max-w-[120px]">
+                <div className="flex items-center border border-zinc-800 rounded-none bg-zinc-950 max-w-[120px]">
                   <button
                     disabled={quantity <= 1}
                     onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
@@ -290,107 +321,172 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
                 onClick={handleAddToCart}
-                className="btn-electric flex-1 flex items-center justify-center gap-2.5 bg-brand-offwhite text-brand-black hover:bg-brand-red hover:text-brand-offwhite font-bold text-xs uppercase tracking-widest py-4 px-6 rounded shadow-lg transition-all duration-300"
+                disabled={isAdding}
+                className="btn-primary flex-1 relative overflow-hidden"
               >
-                <ShoppingBag className="w-4 h-4" />
-                Add to Bag
+                <span
+                  className={`absolute inset-0 bg-brand-red transition-transform duration-300 origin-left ${isAdding ? 'scale-x-100' : 'scale-x-0'
+                    }`}
+                />
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  {isAdding ? (
+                    <span className="animate-scale-in">✓</span>
+                  ) : (
+                    <>
+                      <ShoppingBag className="w-4 h-4" />
+                      <span>Add to Bag</span>
+                    </>
+                  )}
+                </span>
               </button>
               <button
                 onClick={handleBuyNow}
-                className="flex-1 flex items-center justify-center gap-2.5 border border-zinc-800 hover:border-brand-offwhite text-brand-offwhite font-bold text-xs uppercase tracking-widest py-4 px-6 rounded transition-all duration-300"
+                className="btn-outline flex-1"
               >
-                <CreditCard className="w-4 h-4 text-brand-red" />
-                Buy It Now
+                <span>Buy It Now</span>
               </button>
             </div>
           </div>
 
-          {/* Description Tabs */}
-          <div className="pt-8 border-t border-zinc-900">
-            {/* Tabs Headers */}
-            <div className="flex border-b border-zinc-900 mb-4 text-xs font-bold uppercase tracking-widest">
-              <button
-                onClick={() => setActiveTab('details')}
-                className={`pb-2 pr-6 border-b-2 transition-colors ${
-                  activeTab === 'details' ? 'border-brand-red text-brand-offwhite' : 'border-transparent text-zinc-500 hover:text-brand-offwhite'
-                }`}
-              >
-                Specs
-              </button>
-              <button
-                onClick={() => setActiveTab('shipping')}
-                className={`pb-2 px-6 border-b-2 transition-colors ${
-                  activeTab === 'shipping' ? 'border-brand-red text-brand-offwhite' : 'border-transparent text-zinc-500 hover:text-brand-offwhite'
-                }`}
-              >
-                Shipping
-              </button>
-              <button
-                onClick={() => setActiveTab('returns')}
-                className={`pb-2 px-6 border-b-2 transition-colors ${
-                  activeTab === 'returns' ? 'border-brand-red text-brand-offwhite' : 'border-transparent text-zinc-500 hover:text-brand-offwhite'
-                }`}
-              >
-                Returns
-              </button>
+          {/* Trust Strip */}
+          <div className="trust-strip flex-wrap" aria-label="Purchase assurances">
+            <div className="trust-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+              Secure Checkout
             </div>
+            <div className="trust-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+              Free Shipping ₹999+
+            </div>
+            <div className="trust-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+              7-Day Easy Returns
+            </div>
+            <div className="trust-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+              Ships in 24 Hours
+            </div>
+          </div>
 
-            {/* Tabs Content */}
-            <div className="text-zinc-500 text-xs leading-relaxed min-h-[60px]">
-              {activeTab === 'details' && (
-                <ul className="list-disc pl-4 space-y-1.5">
-                  <li>Oversized, drop-shoulder streetwear fit.</li>
-                  <li>Curated heavyweight organic knit fabrics.</li>
-                  <li>High-density graphics/puff print details.</li>
-                  <li>Double-stitched seams for shape retention.</li>
-                  <li>Pre-shrunk and silicone softened.</li>
-                </ul>
-              )}
-              {activeTab === 'shipping' && (
-                <p>
-                  Express delivery across India. Orders processed in Bengaluru within 24 hours. Estimated delivery: 2-3 days for Southern India / Metro Cities, 4-6 days for rest of India. Free delivery above ₹999.
-                </p>
-              )}
-              {activeTab === 'returns' && (
-                <p>
-                  Easy 7-day returns & size exchange policy. Products must be returned in original conditions with swing tags attached. Drop us a message on WhatsApp (+91 7406164512) to register returns.
-                </p>
-              )}
-            </div>
+          {/* Accordion — Details / Shipping / Returns */}
+          <div className="pt-6 border-t border-brand-graphite space-y-0" role="list" aria-label="Product information">
+            {(
+              [
+                {
+                  id: 'details' as const,
+                  label: 'Product Specs',
+                  content: (
+                    <ul className="space-y-2.5 text-brand-stone text-xs leading-relaxed">
+                      <li className="flex items-start gap-2"><span className="text-brand-amber mt-0.5" aria-hidden="true">◆</span>Oversized, drop-shoulder streetwear fit</li>
+                      <li className="flex items-start gap-2"><span className="text-brand-amber mt-0.5" aria-hidden="true">◆</span>Curated heavyweight organic knit fabrics</li>
+                      <li className="flex items-start gap-2"><span className="text-brand-amber mt-0.5" aria-hidden="true">◆</span>High-density graphics / puff print details</li>
+                      <li className="flex items-start gap-2"><span className="text-brand-amber mt-0.5" aria-hidden="true">◆</span>Double-stitched seams for shape retention</li>
+                      <li className="flex items-start gap-2"><span className="text-brand-amber mt-0.5" aria-hidden="true">◆</span>Pre-shrunk and silicone softened</li>
+                    </ul>
+                  )
+                },
+                {
+                  id: 'shipping' as const,
+                  label: 'Shipping Info',
+                  content: (
+                    <p className="text-brand-stone text-xs leading-relaxed">
+                      Express delivery across India. Orders processed in Bengaluru within 24 hours.
+                      Estimated delivery: 2–3 days for Southern India / Metro Cities,
+                      4–6 days for rest of India. <strong className="text-brand-offwhite">Free shipping above ₹999.</strong>
+                    </p>
+                  )
+                },
+                {
+                  id: 'returns' as const,
+                  label: 'Returns & Exchanges',
+                  content: (
+                    <p className="text-brand-stone text-xs leading-relaxed">
+                      Easy 7-day returns & size exchange policy. Products must be returned in
+                      original condition with swing tags attached. WhatsApp us at
+                      <a href="tel:+917406164512" className="text-brand-amber ml-1 hover:underline">+91 74061 64512</a> to register returns.
+                    </p>
+                  )
+                },
+              ]
+            ).map(({ id, label, content }) => (
+              <div key={id} role="listitem">
+                <button
+                  onClick={() => setActiveTab(activeTab === id ? '' : (id as 'details' | 'shipping' | 'returns'))}
+                  className={`accordion-trigger ${activeTab === id ? 'open' : ''}`}
+                  aria-expanded={activeTab === id}
+                  aria-controls={`accordion-${id}`}
+                  id={`accordion-trigger-${id}`}
+                >
+                  {label}
+                  <svg
+                    className="accordion-icon"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    aria-hidden="true"
+                  >
+                    <path d="M8 3v10M3 8h10" strokeLinecap="round" />
+                  </svg>
+                </button>
+                <div
+                  id={`accordion-${id}`}
+                  role="region"
+                  aria-labelledby={`accordion-trigger-${id}`}
+                  className={`accordion-content ${activeTab === id ? 'open' : ''}`}
+                >
+                  <div className="py-4 pr-6">{content}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
       {/* Related Products Grid */}
       {relatedProducts.length > 0 && (
-        <section className="border-t border-zinc-900 pt-16">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-lg md:text-xl font-extrabold uppercase tracking-wider text-brand-offwhite">
-              RELATED DROPS
-            </h2>
-            <Link href="/shop" className="text-xs font-bold text-zinc-500 hover:text-brand-red uppercase tracking-wider">
-              View Shop
+        <section className="border-t border-brand-graphite pt-16" aria-labelledby="related-heading">
+          <div className="flex items-center justify-between mb-10">
+            <div className="space-y-2">
+              <span className="eyebrow">You May Also Like</span>
+              <h2 id="related-heading" className="text-xl md:text-2xl font-bold uppercase tracking-wide text-brand-offwhite font-display">
+                Related Drops
+              </h2>
+            </div>
+            <Link
+              href="/shop"
+              className="text-[10px] font-bold text-brand-stone hover:text-brand-offwhite uppercase tracking-[0.2em] transition-colors border-animate pb-0.5"
+              aria-label="Browse all products in the shop"
+            >
+              View All
             </Link>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
             {relatedProducts.map((p) => (
               <Link
                 key={p.id}
                 href={`/shop/${p.slug}`}
-                className="group flex flex-col border border-zinc-900 bg-zinc-950/20 rounded-md overflow-hidden hover:border-zinc-800 transition-all duration-300"
+                className="group flex flex-col product-card"
+                aria-label={`View ${p.name} — ₹${(p.price / 100).toLocaleString('en-IN')}`}
               >
-                <div className="aspect-[3/4] bg-zinc-950 overflow-hidden">
-                  <img
-                    src={p.images[0]}
-                    alt={p.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 filter grayscale"
+                <div className="product-card-image aspect-[3/4] bg-brand-graphite">
+                  <NextImage
+                    src={p.images[0] || 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=600'}
+                    alt={`${p.name} — ${p.category} by DRFTN Clothing`}
+                    fill
+                    sizes="(max-width: 640px) 50vw, 25vw"
+                    className="object-cover"
                   />
+                  <div className="product-card-overlay" aria-hidden="true" />
                 </div>
-                <div className="p-4 space-y-1">
-                  <h4 className="text-xs font-bold text-brand-offwhite uppercase line-clamp-1 group-hover:text-brand-red transition-colors">
+                <div className="pt-3 space-y-1">
+                  <p className="text-[9px] text-brand-stone uppercase tracking-[0.2em] font-semibold">{p.category}</p>
+                  <h3 className="text-xs font-medium text-brand-offwhite uppercase line-clamp-1 group-hover:text-brand-amber transition-colors font-body">
                     {p.name}
-                  </h4>
-                  <p className="text-xs font-bold text-brand-offwhite">₹{(p.price / 100).toFixed(2)}</p>
+                  </h3>
+                  <p className="text-xs font-semibold text-brand-offwhite font-body">
+                    ₹{(p.price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                  </p>
                 </div>
               </Link>
             ))}
@@ -418,7 +514,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-zinc-400 border-collapse">
                 <thead>

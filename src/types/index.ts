@@ -6,6 +6,7 @@ export interface Product {
   price: number;
   compare_price?: number;
   category: string; // tees, hoodies, joggers, accessories
+  subcategory?: string;
   gender: string; // unisex, men, women
   images: string[];
   sizes: string[];
