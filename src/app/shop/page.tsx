@@ -215,7 +215,7 @@ function ShopContent() {
         setLoading(true);
         const [prods, cats] = await Promise.all([
           dbService.getProducts(),
-          dbService.getAllCategories()
+          dbService.getCategories()
         ]);
         setProducts(prods);
         setCategoriesList(cats);
