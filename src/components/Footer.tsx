@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { MapPin, Phone, Mail, ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronUp, ShieldCheck, Lock, RefreshCw } from 'lucide-react';
 import { toast } from '@/lib/toast';
 
 const InstagramIcon = ({ className }: { className?: string }) => (
@@ -15,43 +15,63 @@ const InstagramIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const WhatsAppIcon = ({ className }: { className?: string }) => (
+const FacebookIcon = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
   </svg>
 );
 
-// Payment method SVG icons
+const PinterestIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    <line x1="12" x2="12" y1="8" y2="16" />
+    <line x1="8" x2="16" y1="12" y2="12" />
+    <circle cx="12" cy="12" r="10" />
+  </svg>
+);
+
+const YoutubeIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2C5.12 20 12 20 12 20s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 2.78 2.78 0 0 0-.46-5.33z" />
+    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" />
+  </svg>
+);
+
 const PaymentIcons = () => (
   <div className="flex items-center gap-2 flex-wrap" aria-label="Accepted payment methods">
-    {/* Razorpay */}
-    <div className="h-5 px-2 bg-brand-graphite border border-brand-muted/40 rounded flex items-center">
-      <span className="text-[8px] font-bold tracking-wider text-brand-silver">RAZORPAY</span>
-    </div>
-    {/* UPI */}
-    <div className="h-5 px-2 bg-brand-graphite border border-brand-muted/40 rounded flex items-center">
-      <span className="text-[8px] font-bold tracking-wider text-brand-silver">UPI</span>
-    </div>
-    {/* Visa */}
-    <div className="h-5 px-2 bg-brand-graphite border border-brand-muted/40 rounded flex items-center">
-      <span className="text-[8px] font-bold tracking-wider text-blue-400">VISA</span>
-    </div>
-    {/* Mastercard */}
-    <div className="h-5 px-2 bg-brand-graphite border border-brand-muted/40 rounded flex items-center">
-      <span className="text-[8px] font-bold tracking-wider text-brand-silver">MC</span>
-    </div>
-    {/* COD */}
-    <div className="h-5 px-2 bg-brand-graphite border border-brand-muted/40 rounded flex items-center">
-      <span className="text-[8px] font-bold tracking-wider text-brand-amber">COD</span>
-    </div>
+    {['VISA', 'MASTERCARD', 'RUPAY', 'UPI', 'PAYTM', 'GPAY', 'COD'].map((pay) => (
+      <div key={pay} className="h-5 px-2 bg-brand-graphite border border-brand-muted/40 rounded flex items-center">
+        <span className="text-[8px] font-bold tracking-wider text-brand-silver font-mono">{pay}</span>
+      </div>
+    ))}
+  </div>
+);
+
+const TrustBadges = () => (
+  <div className="flex items-center gap-4 flex-wrap text-zinc-500 text-[9px] uppercase tracking-wider font-bold font-mono">
+    <span className="flex items-center gap-1">
+      <ShieldCheck className="w-3.5 h-3.5 text-brand-red flex-shrink-0" /> 100% Secure Checkout
+    </span>
+    <span className="flex items-center gap-1">
+      <Lock className="w-3.5 h-3.5 text-brand-red flex-shrink-0" /> SSL Secured
+    </span>
+    <span className="flex items-center gap-1">
+      <RefreshCw className="w-3.5 h-3.5 text-brand-red flex-shrink-0" /> Easy Returns
+    </span>
   </div>
 );
 
 export default function Footer() {
   const pathname = usePathname();
   const [email, setEmail] = useState('');
+  
+  // Mobile accordion toggle state
+  const [activeAccordion, setActiveAccordion] = useState<string | null>(null);
 
   if (pathname?.startsWith('/admin')) return null;
+
+  const toggleAccordion = (sectionName: string) => {
+    setActiveAccordion(prev => prev === sectionName ? null : sectionName);
+  };
 
   const handleNewsletterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,192 +80,230 @@ export default function Footer() {
     setEmail('');
   };
 
+  const shopLinks = [
+    { label: 'New Arrivals', href: '/shop?sort=newest' },
+    { label: 'Men Apparel', href: '/shop?gender=men' },
+    { label: 'Women Apparel', href: '/shop?gender=women' },
+    { label: 'Best Sellers', href: '/shop?sort=featured' },
+    { label: 'Store Sale', href: '/shop' }
+  ];
+
+  const customerLinks = [
+    { label: 'Contact Us', href: '/contact' },
+    { label: 'Track My Order', href: '/track' },
+    { label: 'Shipping & Delivery', href: '/policies/shipping-and-delivery-policy' },
+    { label: 'Returns & Exchange', href: '/policies/refund-return-exchange-policy' },
+    { label: 'Size Chart Disclaimer', href: '/policies/disclaimer' },
+    { label: 'Cancellation Rules', href: '/policies/cancellation-policy' }
+  ];
+
+  const companyLinks = [
+    { label: 'About Us', href: '/about' },
+    { label: 'Careers (Fulfillment)', href: '/policies/disclaimer' },
+    { label: 'DRFTN Lookbook', href: '/policies/disclaimer' },
+    { label: 'Store Locations', href: '/policies/disclaimer' },
+    { label: 'Bulk Orders', href: '/contact' }
+  ];
+
+  const legalLinks = [
+    { label: 'Terms & Conditions', href: '/policies/terms-and-conditions' },
+    { label: 'Privacy Policy', href: '/policies/privacy-policy' },
+    { label: 'Cookie Policy', href: '/policies/cookie-policy' },
+    { label: 'Grievance Redressal', href: '/policies/grievance-redressal-policy' },
+    { label: 'Store Disclaimer', href: '/policies/disclaimer' }
+  ];
+
   return (
-    <footer className="bg-brand-charcoal border-t border-brand-graphite text-brand-gray text-sm mt-auto">
-
-      {/* ── Newsletter Strip ── */}
-      <div className="border-b border-brand-graphite">
-        <div className="max-w-screen-2xl mx-auto px-6 md:px-12 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-0.5">
-            <p className="text-[10px] tracking-[0.3em] uppercase text-brand-amber font-body font-semibold">
-              Inner Circle
-            </p>
-            <p className="text-brand-offwhite font-display text-xl uppercase font-bold">
-              Be First to the Drop
-            </p>
-          </div>
-          <form
-            onSubmit={handleNewsletterSubmit}
-            className="flex gap-2 w-full sm:w-auto sm:min-w-[340px]"
-            aria-label="Newsletter signup"
-          >
-            <label htmlFor="footer-email" className="sr-only">Email address</label>
-            <input
-              id="footer-email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              className="flex-1 px-4 py-2.5 text-xs bg-brand-graphite border border-brand-muted text-brand-offwhite placeholder-brand-gray focus:border-brand-amber focus:outline-none font-body"
-            />
-            <button
-              type="submit"
-              className="btn-primary px-5 py-2.5 text-[10px] tracking-widest whitespace-nowrap"
-              aria-label="Subscribe to newsletter"
-            >
-              <span>Join</span>
-              <ArrowRight className="w-3 h-3 relative z-10" aria-hidden="true" />
-            </button>
-          </form>
-        </div>
-      </div>
-
-      {/* ── Main Footer Grid ── */}
-      <div className="max-w-screen-2xl mx-auto px-6 md:px-12 py-14 md:py-20 grid grid-cols-2 md:grid-cols-5 gap-10 md:gap-12">
-
-        {/* Brand Column — spans 2 cols */}
-        <div className="col-span-2 space-y-5">
-          {/* Logo — fixed: no negative margin hack */}
-          <Link
-            href="/"
-            className="inline-block"
-            aria-label="DRFTN Clothing — Home"
-          >
-            <div className="relative w-36 h-18">
+    <footer className="bg-brand-charcoal border-t border-brand-graphite text-brand-gray text-sm mt-auto pb-6 md:pb-0">
+      
+      {/* ── Main Footer Layout ── */}
+      <div className="max-w-screen-2xl mx-auto px-6 md:px-12 py-12 md:py-20 flex flex-col lg:flex-row gap-12 lg:gap-16">
+        
+        {/* Column 1: Brand details (Tagline, Socials & Newsletter) - spans larger area */}
+        <div className="flex-1 lg:max-w-sm space-y-6">
+          <Link href="/" className="inline-block" aria-label="DRFTN Clothing — Home">
+            <div className="relative w-36 h-12">
               <Image
                 src="/logo.png?v=3"
                 alt="DRFTN Clothing"
                 fill
                 sizes="144px"
-                className="object-contain object-left opacity-90 hover:opacity-100 transition-opacity"
+                className="object-contain object-left opacity-95 hover:opacity-100 transition-opacity"
               />
             </div>
           </Link>
-
-          <p className="text-brand-stone text-xs leading-relaxed max-w-xs font-body font-light">
-            Born in Yelahanka, Bengaluru. Premium, imported streetwear and unisex fashion
-            crafted for those who move with intention.
+          <p className="text-brand-stone text-xs leading-relaxed font-body font-light max-w-xs">
+            Born in Yelahanka, Bengaluru. Premium, imported streetwear and unisex fashion crafted for those who move with intention.
           </p>
 
           {/* Socials */}
-          <div className="flex items-center gap-2.5 pt-1" aria-label="Social media links">
-            <a
-              href="https://instagram.com/drftnclothing"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-8 h-8 flex items-center justify-center border border-brand-muted hover:border-brand-amber text-brand-gray hover:text-brand-amber transition-colors"
-              aria-label="Follow DRFTN on Instagram"
-            >
-              <InstagramIcon className="w-3.5 h-3.5" />
-            </a>
-            <a
-              href="https://wa.me/917406164512"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-8 h-8 flex items-center justify-center border border-brand-muted hover:border-brand-amber text-brand-gray hover:text-brand-amber transition-colors"
-              aria-label="Chat with DRFTN on WhatsApp"
-            >
-              <WhatsAppIcon className="w-3.5 h-3.5" />
-            </a>
+          <div className="flex items-center gap-2.5" aria-label="Social media links">
+            {[
+              { label: 'Instagram', icon: InstagramIcon, href: 'https://instagram.com/drftnclothing' },
+              { label: 'Facebook', icon: FacebookIcon, href: 'https://instagram.com/drftnclothing' },
+              { label: 'Pinterest', icon: PinterestIcon, href: 'https://instagram.com/drftnclothing' },
+              { label: 'YouTube', icon: YoutubeIcon, href: 'https://instagram.com/drftnclothing' }
+            ].map((soc) => {
+              const Icon = soc.icon;
+              return (
+                <a
+                  key={soc.label}
+                  href={soc.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-8 h-8 flex items-center justify-center border border-brand-muted hover:border-brand-amber text-brand-gray hover:text-brand-amber transition-colors"
+                  aria-label={`Follow DRFTN on ${soc.label}`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                </a>
+              );
+            })}
+          </div>
+
+          {/* Newsletter Box */}
+          <div className="space-y-2 pt-2">
+            <span className="text-[9px] uppercase tracking-[0.25em] font-bold text-brand-amber block">Join the Drop List</span>
+            <form onSubmit={handleNewsletterSubmit} className="flex max-w-xs" aria-label="Newsletter signup">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                className="flex-1 px-3 py-2 text-xs bg-zinc-950 border border-brand-graphite text-brand-offwhite placeholder-zinc-600 focus:border-brand-red focus:outline-none font-mono"
+              />
+              <button
+                type="submit"
+                className="bg-brand-red hover:bg-red-650 text-white px-3 flex items-center justify-center transition-colors"
+                aria-label="Subscribe"
+              >
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </form>
           </div>
         </div>
 
-        {/* Shop Column */}
-        <nav aria-label="Shop links">
-          <h2 className="text-[10px] font-bold uppercase tracking-[0.25em] text-brand-offwhite font-body mb-5">
-            Shop
-          </h2>
-          <ul className="space-y-3">
-            {[
-              { label: 'All Drops', href: '/shop' },
-              { label: 'T-Shirts', href: '/shop?category=t-shirts' },
-              { label: 'Hoodies', href: '/shop?category=hoodies' },
-              { label: 'Denims', href: '/shop?category=denims' },
-              { label: 'Jackets', href: '/shop?category=jackets' },
-              { label: 'Accessories', href: '/shop?category=accessories' },
-            ].map((link) => (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className="text-xs tracking-wider text-brand-stone hover:text-brand-offwhite transition-colors font-body"
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        {/* Support Column */}
-        <nav aria-label="Support links">
-          <h2 className="text-[10px] font-bold uppercase tracking-[0.25em] text-brand-offwhite font-body mb-5">
-            Support
-          </h2>
-          <ul className="space-y-3">
-            {[
-              { label: 'Track Order', href: '/track' },
-              { label: 'About Us', href: '/about' },
-              { label: 'Contact', href: '/contact' },
-              { label: 'FAQ', href: '/contact' },
-              { label: 'Returns', href: '/contact' },
-            ].map((link) => (
-              <li key={link.label}>
-                <Link
-                  href={link.href}
-                  className="text-xs tracking-wider text-brand-stone hover:text-brand-offwhite transition-colors font-body"
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        {/* Contact Column */}
-        <address className="space-y-4 not-italic" aria-label="Contact information">
-          <h2 className="text-[10px] font-bold uppercase tracking-[0.25em] text-brand-offwhite font-body mb-5">
-            Reach Us
-          </h2>
-          <ul className="space-y-3.5">
-            <li className="flex items-start gap-2.5">
-              <MapPin className="w-3.5 h-3.5 text-brand-amber mt-0.5 shrink-0" aria-hidden="true" />
-              <span className="text-xs text-brand-stone font-body font-light leading-relaxed">
-                Yelahanka, Bengaluru<br />Karnataka, India
+        {/* columns 2-5: Dynamic grid links with mobile accordion controls */}
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-6 md:gap-8 lg:gap-12">
+          
+          {/* Shop Column */}
+          <div className="space-y-4">
+            <button 
+              onClick={() => toggleAccordion('shop')}
+              className="flex justify-between items-center w-full md:cursor-default text-left md:block border-b border-zinc-900 md:border-none pb-2 md:pb-0"
+            >
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.25em] text-brand-offwhite font-body">Shop</h2>
+              <span className="md:hidden">
+                {activeAccordion === 'shop' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </span>
-            </li>
-            <li className="flex items-center gap-2.5">
-              <Phone className="w-3.5 h-3.5 text-brand-amber shrink-0" aria-hidden="true" />
-              <a
-                href="tel:+917406164512"
-                className="text-xs text-brand-stone hover:text-brand-offwhite transition-colors font-body"
-              >
-                +91 74061 64512
-              </a>
-            </li>
-            <li className="flex items-center gap-2.5">
-              <Mail className="w-3.5 h-3.5 text-brand-amber shrink-0" aria-hidden="true" />
-              <a
-                href="mailto:support@drftn.in"
-                className="text-xs text-brand-stone hover:text-brand-offwhite transition-colors font-body"
-              >
-                support@drftn.in
-              </a>
-            </li>
-          </ul>
-        </address>
+            </button>
+            <ul className={`space-y-2.5 md:block ${activeAccordion === 'shop' ? 'block' : 'hidden'}`}>
+              {shopLinks.map((link) => (
+                <li key={link.label}>
+                  <Link href={link.href} className="text-xs text-brand-stone hover:text-brand-offwhite transition-colors tracking-wide font-body">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Customer Care Column */}
+          <div className="space-y-4">
+            <button 
+              onClick={() => toggleAccordion('customer')}
+              className="flex justify-between items-center w-full md:cursor-default text-left md:block border-b border-zinc-900 md:border-none pb-2 md:pb-0"
+            >
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.25em] text-brand-offwhite font-body">Customer Care</h2>
+              <span className="md:hidden">
+                {activeAccordion === 'customer' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </span>
+            </button>
+            <ul className={`space-y-2.5 md:block ${activeAccordion === 'customer' ? 'block' : 'hidden'}`}>
+              {customerLinks.map((link) => (
+                <li key={link.label}>
+                  <Link href={link.href} className="text-xs text-brand-stone hover:text-brand-offwhite transition-colors tracking-wide font-body">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Company Column */}
+          <div className="space-y-4">
+            <button 
+              onClick={() => toggleAccordion('company')}
+              className="flex justify-between items-center w-full md:cursor-default text-left md:block border-b border-zinc-900 md:border-none pb-2 md:pb-0"
+            >
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.25em] text-brand-offwhite font-body">Company</h2>
+              <span className="md:hidden">
+                {activeAccordion === 'company' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </span>
+            </button>
+            <ul className={`space-y-2.5 md:block ${activeAccordion === 'company' ? 'block' : 'hidden'}`}>
+              {companyLinks.map((link) => (
+                <li key={link.label}>
+                  <Link href={link.href} className="text-xs text-brand-stone hover:text-brand-offwhite transition-colors tracking-wide font-body">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Legal Column */}
+          <div className="space-y-4">
+            <button 
+              onClick={() => toggleAccordion('legal')}
+              className="flex justify-between items-center w-full md:cursor-default text-left md:block border-b border-zinc-900 md:border-none pb-2 md:pb-0"
+            >
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.25em] text-brand-offwhite font-body">Legal</h2>
+              <span className="md:hidden">
+                {activeAccordion === 'legal' ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </span>
+            </button>
+            <ul className={`space-y-2.5 md:block ${activeAccordion === 'legal' ? 'block' : 'hidden'}`}>
+              {legalLinks.map((link) => (
+                <li key={link.label}>
+                  <Link href={link.href} className="text-xs text-brand-stone hover:text-brand-offwhite transition-colors tracking-wide font-body">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+        </div>
       </div>
 
       {/* ── Bottom Bar ── */}
-      <div className="border-t border-brand-graphite">
-        <div className="max-w-screen-2xl mx-auto px-6 md:px-12 py-5 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-[10px] text-brand-stone/60 tracking-[0.15em] font-body">
-            © {new Date().getFullYear()} DRFTN CLOTHING. All Rights Reserved.
-          </p>
-          <PaymentIcons />
-          <p className="text-[10px] text-brand-stone/60 tracking-[0.25em] uppercase font-body">
-            Made in Bengaluru · Drift in Style
-          </p>
+      <div className="border-t border-brand-graphite bg-zinc-950/20 py-8 px-6 md:px-12">
+        <div className="max-w-screen-2xl mx-auto flex flex-col gap-6">
+          
+          {/* Trust and Payment rows */}
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 border-b border-zinc-900 pb-6">
+            <TrustBadges />
+            <PaymentIcons />
+          </div>
+          
+          {/* Copyright, legal disclaimer & credits */}
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-[10px] text-zinc-550 font-mono tracking-wider">
+            <p>
+              © {new Date().getFullYear()} DRFTN CLOTHING. All rights reserved.
+            </p>
+            <div className="flex items-center gap-4 flex-wrap">
+              <Link href="/policies/terms-and-conditions" className="hover:text-brand-offwhite transition-colors">TERMS</Link>
+              <span>|</span>
+              <Link href="/policies/privacy-policy" className="hover:text-brand-offwhite transition-colors">PRIVACY</Link>
+              <span>|</span>
+              <Link href="/sitemap.xml" className="hover:text-brand-offwhite transition-colors">SITEMAP</Link>
+            </div>
+            <p className="uppercase tracking-widest text-[9px] text-zinc-600">
+              Made in Bengaluru · GSTIN: 29XXXXXXXXXX1ZX
+            </p>
+          </div>
+          
         </div>
       </div>
     </footer>

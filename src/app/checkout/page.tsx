@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useCartStore } from '@/lib/cartStore';
-import { ChevronLeft, Lock, CheckCircle, Package, ArrowRight } from 'lucide-react';
+import { ChevronLeft, Lock, CheckCircle, Package, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/components/ToastContainer';
 import { SignInButton, useUser } from '@clerk/nextjs';
 
@@ -531,6 +531,19 @@ export default function CheckoutPage() {
                 Proceed to Payment
                 <ArrowRight className="w-4 h-4" />
               </button>
+              
+              {/* Trust Badge Strip */}
+              <div className="mt-4 flex items-center justify-center gap-6 text-[10px] text-zinc-500 font-mono tracking-wider">
+                <span className="flex items-center gap-1">
+                  <Lock className="w-3 h-3 text-zinc-650" /> SSL SECURED
+                </span>
+                <span className="flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-zinc-650" /> SECURE CHECKOUT
+                </span>
+                <span className="flex items-center gap-1">
+                  <Package className="w-3 h-3 text-zinc-650" /> 7-DAY RETURNS
+                </span>
+              </div>
             </form>
           ) : (
             <div className="space-y-8 animate-fade-in">
@@ -606,6 +619,19 @@ export default function CheckoutPage() {
                   )}
                   {!isProcessing && <Lock className="w-4 h-4" />}
                 </button>
+
+                {/* Trust Badge Strip */}
+                <div className="mt-4 flex items-center justify-center gap-6 text-[10px] text-zinc-500 font-mono tracking-wider">
+                  <span className="flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-zinc-650" /> SSL SECURED
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-zinc-650" /> SECURE CHECKOUT
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Package className="w-3 h-3 text-zinc-650" /> 7-DAY RETURNS
+                  </span>
+                </div>
               </div>
             </div>
           )}

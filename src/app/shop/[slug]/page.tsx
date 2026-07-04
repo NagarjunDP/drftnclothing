@@ -29,6 +29,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
 
   // Gallery & Detail State
   const [activeImage, setActiveImage] = useState<string>('');
+  const [carouselIndex, setCarouselIndex] = useState<number>(0);
   const [selectedSize, setSelectedSize] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [activeTab, setActiveTab] = useState<'details' | 'shipping' | 'returns' | ''>('details');
@@ -190,35 +191,83 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       {/* Main product columns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 mb-20">
         {/* Left: Image Gallery */}
-        <div className="space-y-4">
-          {/* Main frame */}
-          <div className="pdp-main-image aspect-[3/4] bg-zinc-950 rounded-none overflow-hidden border border-zinc-900/60 relative group">
-            <img
-              src={activeImage}
-              alt={product.name}
-              className="w-full h-full object-cover select-none transition-transform duration-500 hover:scale-110"
-            />
+        <div>
+          {/* Mobile Carousel (Hidden on Desktop) */}
+          <div className="block md:hidden relative w-full aspect-[3/4] bg-zinc-950 border border-zinc-900/60 overflow-hidden">
+            <div 
+              onScroll={(e) => {
+                const container = e.currentTarget;
+                const idx = Math.round(container.scrollLeft / container.clientWidth);
+                setCarouselIndex(idx);
+              }}
+              className="flex overflow-x-auto scroll-snap-x-mandatory scrollbar-none w-full h-full"
+              style={{ scrollSnapType: 'x mandatory' }}
+            >
+              {product.images.map((img, idx) => (
+                <div key={idx} className="flex-shrink-0 w-full h-full scroll-snap-align-start relative">
+                  <img 
+                    src={img} 
+                    alt={`Product ${idx}`} 
+                    className="w-full h-full object-cover" 
+                    loading={idx === 0 ? 'eager' : 'lazy'} 
+                  />
+                </div>
+              ))}
+            </div>
+            
             {product.compare_price && product.compare_price > product.price && (
-              <span className="absolute top-4 left-4 bg-brand-red text-brand-offwhite text-[10px] font-bold py-1 px-3 rounded uppercase tracking-wider">
+              <span className="absolute top-4 left-4 border border-brand-offwhite/30 text-brand-offwhite text-[9px] tracking-[0.2em] font-semibold py-1 px-2.5 uppercase bg-brand-black/60 backdrop-blur-sm z-10">
                 Sale
               </span>
             )}
+
+            {/* Indicator badge: e.g. 2 / 6 */}
+            {product.images.length > 1 && (
+              <div className="absolute bottom-4 right-4 bg-brand-black/80 border border-zinc-800 text-[10px] font-mono text-brand-offwhite px-2.5 py-1 font-bold rounded tracking-widest uppercase">
+                {carouselIndex + 1} / {product.images.length}
+              </div>
+            )}
           </div>
-          {/* Thumbnails row */}
-          {product.images.length > 1 && (
-            <div className="grid grid-cols-5 gap-2.5">
-              {product.images.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveImage(img)}
-                  className={`aspect-square bg-zinc-950 rounded border overflow-hidden transition-all ${activeImage === img ? 'border-brand-red' : 'border-zinc-900/60 hover:border-zinc-700'
+
+          {/* Desktop Layout (Hidden on Mobile) */}
+          <div className="hidden md:flex flex-row gap-4 w-full">
+            {/* Vertical thumbnail rail */}
+            {product.images.length > 1 && (
+              <div className="w-20 flex-shrink-0 flex flex-col gap-2.5 max-h-[500px] overflow-y-auto scrollbar-none pr-1">
+                {product.images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveImage(img)}
+                    className={`aspect-[3/4] w-full bg-zinc-950 rounded border overflow-hidden transition-all ${
+                      activeImage === img ? 'border-brand-red' : 'border-zinc-900/60 hover:border-zinc-700'
                     }`}
-                >
-                  <img src={img} alt={`Thumbnail ${idx}`} className="w-full h-full object-cover filter grayscale hover:filter-none" />
-                </button>
-              ))}
+                  >
+                    <img 
+                      src={img} 
+                      alt={`Thumbnail ${idx}`} 
+                      className="w-full h-full object-cover filter grayscale hover:filter-none" 
+                      loading="lazy"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Main active image frame */}
+            <div className="pdp-main-image flex-1 aspect-[3/4] bg-zinc-950 rounded-none overflow-hidden border border-zinc-900/60 relative group">
+              <img
+                src={activeImage}
+                alt={product.name}
+                className="w-full h-full object-cover select-none transition-transform duration-500 hover:scale-110"
+                loading="eager"
+              />
+              {product.compare_price && product.compare_price > product.price && (
+                <span className="absolute top-4 left-4 border border-brand-offwhite/30 text-brand-offwhite text-[9px] tracking-[0.2em] font-semibold py-1 px-2.5 uppercase bg-brand-black/60 backdrop-blur-sm z-10">
+                  Sale
+                </span>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Right: Info Details */}

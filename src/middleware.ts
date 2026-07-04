@@ -96,21 +96,33 @@ export default clerkMiddleware(async (auth, request) => {
       return NextResponse.redirect(loginUrl);
     }
 
-    // Role check - role must be 'admin' in Clerk metadata
+    // Fetch Clerk user details to verify email allowlist and public metadata role
     let userRole = (session.sessionClaims?.metadata as any)?.role || (session.sessionClaims?.publicMetadata as any)?.role;
+    let userEmail: string | undefined = undefined;
 
-    // Fallback: If role is not mapped in sessionClaims, fetch it directly from the Clerk Backend API
-    if (!userRole && session.userId) {
-      try {
-        const client = await clerkClient();
-        const user = await client.users.getUser(session.userId);
-        userRole = (user.publicMetadata as any)?.role;
-      } catch (err) {
-        console.error('Clerk middleware metadata fetch failed:', err);
-      }
+    try {
+      const client = await clerkClient();
+      const user = await client.users.getUser(session.userId);
+      userRole = userRole || (user.publicMetadata as any)?.role;
+      userEmail = user.emailAddresses.find(
+        (e: any) => e.id === user.primaryEmailAddressId
+      )?.emailAddress || user.emailAddresses[0]?.emailAddress;
+    } catch (err) {
+      console.error('Clerk middleware user fetch failed:', err);
     }
 
-    if (userRole !== 'admin') {
+    const allowlist = (process.env.ADMIN_ALLOWLIST_EMAILS || '')
+      .split(',')
+      .map(e => e.trim().toLowerCase())
+      .filter(Boolean);
+
+    const isEmailAllowed = userEmail && allowlist.includes(userEmail.toLowerCase());
+    const isAdmin = userRole === 'admin';
+
+    // Authorized if email is in allowlist OR user has explicit admin role metadata in Clerk
+    const isAuthorized = isEmailAllowed || isAdmin;
+
+    if (!isAuthorized) {
       if (pathname.startsWith('/api/')) {
         return new NextResponse(
           JSON.stringify({ error: 'Unauthorized: Admins only' }),

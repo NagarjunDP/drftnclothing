@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/db';
-import * as schema from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { dbService } from '@/lib/db';
 import { adminProductSchema } from '@/lib/validations';
 
 /**
@@ -10,11 +8,7 @@ import { adminProductSchema } from '@/lib/validations';
  */
 export async function GET() {
   try {
-    const products = await db
-      .select()
-      .from(schema.products)
-      .orderBy(desc(schema.products.created_at));
-
+    const products = await dbService.getAllProducts();
     return NextResponse.json({ products: products || [] });
   } catch (error) {
     console.error('Admin products GET exception:', error);
@@ -39,39 +33,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const {
-      name,
-      slug,
-      description,
-      price,
-      compare_price,
-      category,
-      gender,
-      images,
-      sizes,
-      stock_quantity,
-      is_featured,
-      is_active,
-    } = validationResult.data;
-
-    // Insert to products table using Drizzle
-    const [newProduct] = await db
-      .insert(schema.products)
-      .values({
-        name,
-        slug,
-        description,
-        price,
-        compare_price: compare_price || null,
-        category,
-        gender,
-        images,
-        sizes,
-        stock_quantity,
-        is_featured: is_featured || false,
-        is_active: is_active !== undefined ? is_active : true,
-      })
-      .returning();
+    // Create product via dbService
+    const newProduct = await dbService.createProduct(validationResult.data as any);
 
     return NextResponse.json({ success: true, product: newProduct });
   } catch (error) {
@@ -105,19 +68,8 @@ export async function PATCH(request: Request) {
       );
     }
 
-    // Perform database update via Drizzle
-    const [updatedProduct] = await db
-      .update(schema.products)
-      .set({
-        ...validationResult.data,
-        updated_at: new Date(),
-      })
-      .where(eq(schema.products.id, id))
-      .returning();
-
-    if (!updatedProduct) {
-      return NextResponse.json({ error: 'Product not found or failed to update' }, { status: 404 });
-    }
+    // Update product via dbService
+    const updatedProduct = await dbService.updateProduct(id, validationResult.data as any);
 
     return NextResponse.json({ success: true, product: updatedProduct });
   } catch (error) {
@@ -139,12 +91,8 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Product ID parameter is required' }, { status: 400 });
     }
 
-    const deleted = await db
-      .delete(schema.products)
-      .where(eq(schema.products.id, id))
-      .returning();
-
-    if (deleted.length === 0) {
+    const success = await dbService.deleteProduct(id);
+    if (!success) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 

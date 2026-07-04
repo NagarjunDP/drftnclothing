@@ -63,14 +63,14 @@ export default function AnnouncementTicker() {
 
   return (
     <section
-      className="relative border-y border-brand-graphite bg-brand-black select-none overflow-hidden"
+      className="relative border-y border-[#2A2A2A] bg-brand-black select-none overflow-hidden"
       aria-label="Announcement"
       aria-live="polite"
       aria-atomic="true"
     >
       {/* Dot nav — left side */}
       <div
-        className="absolute left-5 inset-y-0 hidden sm:flex items-center gap-1.5 z-10"
+        className="absolute left-4 sm:left-5 inset-y-0 flex items-center gap-1 sm:gap-1.5 z-10"
         aria-hidden="true"
       >
         {MESSAGES.map((_, i) => (
@@ -78,7 +78,7 @@ export default function AnnouncementTicker() {
             key={i}
             onClick={() => { setIdx(i); setBarKey((k) => k + 1); }}
             className={`w-1 rounded-full transition-all duration-300 ${i === idx
-                ? 'h-3.5 bg-brand-amber'
+                ? 'h-3.5 bg-brand-offwhite'
                 : 'h-1 bg-brand-stone/30 hover:bg-brand-stone/60'
               }`}
             aria-label={`Go to message ${i + 1}`}
@@ -87,7 +87,7 @@ export default function AnnouncementTicker() {
       </div>
 
       {/* Message area */}
-      <div className="flex items-center justify-center py-3 px-16 sm:px-20 min-h-[44px] relative">
+      <div className="flex items-center justify-center py-3 px-10 sm:px-20 min-h-[44px] relative">
         <AnimatePresence mode="wait">
           <motion.div
             key={idx}
@@ -95,30 +95,17 @@ export default function AnnouncementTicker() {
             initial="enter"
             animate="center"
             exit="exit"
-            className="flex items-center gap-2 sm:gap-3 text-center"
+            className="flex items-center gap-2.5 sm:gap-3.5 text-center"
           >
-            {/* Amber accent mark — brand-specific minimal mark, not a diamond */}
-            <span className="hidden sm:inline-block text-brand-amber" aria-hidden="true">
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <rect x="1" y="1" width="8" height="8" stroke="currentColor" strokeWidth="1.25" transform="rotate(45 5 5)" />
-              </svg>
-            </span>
-
-            <span className="font-display uppercase text-brand-offwhite text-[10px] sm:text-[11px] tracking-[0.4em] leading-none font-bold">
+            <span className="font-display uppercase text-brand-offwhite text-[8.5px] sm:text-[11px] tracking-[0.22em] sm:tracking-[0.4em] leading-none font-bold">
               {msg.label}
             </span>
 
-            {/* Divider — small dot */}
-            <span className="hidden sm:inline-block w-1 h-1 rounded-full bg-brand-stone/40" aria-hidden="true" />
+            {/* Divider — simple vertical line */}
+            <span className="hidden sm:inline-block text-zinc-700 font-mono text-xs" aria-hidden="true">|</span>
 
             <span className="text-brand-stone text-[9px] sm:text-[10px] tracking-[0.25em] uppercase font-body hidden sm:inline">
               {msg.detail}
-            </span>
-
-            <span className="hidden sm:inline-block text-brand-amber" aria-hidden="true">
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <rect x="1" y="1" width="8" height="8" stroke="currentColor" strokeWidth="1.25" transform="rotate(45 5 5)" />
-              </svg>
             </span>
           </motion.div>
         </AnimatePresence>
@@ -128,7 +115,7 @@ export default function AnnouncementTicker() {
       <div className="absolute bottom-0 inset-x-0 h-[2px] bg-brand-graphite" aria-hidden="true">
         <motion.div
           key={barKey}
-          className="h-full bg-brand-amber/70"
+          className="h-full bg-brand-offwhite/20"
           initial={{ scaleX: 0, originX: '0%' }}
           animate={{ scaleX: 1 }}
           transition={{

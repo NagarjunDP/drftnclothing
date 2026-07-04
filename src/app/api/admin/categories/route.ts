@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import * as schema from '@/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, or, count } from 'drizzle-orm';
 import { z } from 'zod';
 
 const categorySchema = z.object({
   name: z.string().min(2),
   slug: z.string().min(2),
   image_url: z.string().url().optional().or(z.literal('')),
+  description: z.string().optional().nullable(),
+  parent_id: z.string().uuid().optional().nullable(),
   is_active: z.boolean().default(true),
   display_order: z.number().int().default(0),
 });
@@ -34,14 +36,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid category inputs', details: validation.error.format() }, { status: 400 });
     }
 
-    const { name, slug, image_url, is_active, display_order } = validation.data;
+    const { name, slug, image_url, description, parent_id, is_active, display_order } = validation.data;
 
     const [newCat] = await db
       .insert(schema.categories)
       .values({
         name,
         slug,
-        image_url,
+        image_url: image_url || null,
+        description: description || null,
+        parent_id: parent_id || null,
         is_active,
         display_order,
       })
@@ -99,6 +103,49 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Category ID parameter is required' }, { status: 400 });
     }
 
+    // 1. Fetch category to get the slug
+    const [category] = await db
+      .select()
+      .from(schema.categories)
+      .where(eq(schema.categories.id, id))
+      .limit(1);
+
+    if (!category) {
+      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+    }
+
+    // 2. Check if it has any subcategories
+    const [subCountResult] = await db
+      .select({ val: count() })
+      .from(schema.categories)
+      .where(eq(schema.categories.parent_id, id));
+
+    if (subCountResult && Number(subCountResult.val) > 0) {
+      return NextResponse.json(
+        { error: `Cannot delete category because it has ${subCountResult.val} subcategories assigned. Delete or reassign the subcategories first.` },
+        { status: 400 }
+      );
+    }
+
+    // 3. Check if any products use this category or subcategory slug
+    const [prodCountResult] = await db
+      .select({ val: count() })
+      .from(schema.products)
+      .where(
+        or(
+          eq(schema.products.category, category.slug),
+          eq(schema.products.subcategory, category.slug)
+        )
+      );
+
+    if (prodCountResult && Number(prodCountResult.val) > 0) {
+      return NextResponse.json(
+        { error: `Cannot delete category. ${prodCountResult.val} products are currently assigned to it (as category or subcategory). Reassign them first.` },
+        { status: 400 }
+      );
+    }
+
+    // 4. Safe to delete
     const deleted = await db
       .delete(schema.categories)
       .where(eq(schema.categories.id, id))

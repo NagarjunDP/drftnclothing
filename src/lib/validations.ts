@@ -72,6 +72,7 @@ export const adminProductSchema = z.object({
   price: z.number().positive(),
   compare_price: z.number().positive().optional(),
   category: z.string().min(2),
+  subcategory: z.string().min(2).optional().nullable(),
   gender: z.string().min(2),
   images: z.array(z.string().url()).min(1),
   sizes: z.array(SizeEnum).min(1),

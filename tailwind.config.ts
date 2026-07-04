@@ -25,8 +25,8 @@ const config: Config = {
           gold: "#B8965A",
           goldLight: "#D4AF6E",
           // Editorial accent — muted rust/amber (for decorative states, not destructive)
-          amber: "#C97B3A",
-          amberLight: "#E8A96A",
+          amber: "#8B7355",
+          amberLight: "#E8E4DC",
           // Stone grey — secondary text and hairline dividers
           stone: "#8C8A85",
           stoneLight: "#D9D6CF",

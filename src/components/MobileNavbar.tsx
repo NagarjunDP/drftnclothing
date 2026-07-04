@@ -38,148 +38,124 @@ export default function MobileNavbar() {
   return (
     <>
       <nav
-        className="md:hidden fixed bottom-5 left-1/2 -translate-x-1/2 w-[92%] max-w-sm z-50 transition-transform duration-300"
+        className="md:hidden fixed bottom-0 left-0 right-0 w-full z-50 bg-[#0A0A0A] border-t border-brand-graphite/80 shadow-[0_-4px_24px_rgba(0,0,0,0.7)]"
         aria-label="Mobile bottom navigation"
       >
-        {/* Floating pill container */}
-        <div className="relative bg-brand-charcoal/90 backdrop-blur-xl rounded-full border border-brand-graphite/80 shadow-2xl shadow-black/80 overflow-hidden">
-          {/* Ambient inner glow */}
-          <div className="absolute inset-0 rounded-full bg-gradient-to-t from-brand-graphite/20 to-transparent pointer-events-none" aria-hidden="true" />
+        <div className="relative flex items-center justify-between px-4 py-2 pb-5">
+          
+          {/* 1. Home Tab */}
+          <Link
+            href="/"
+            className={`flex flex-col items-center gap-1 py-2 rounded-none transition-colors duration-200 flex-1 min-w-[56px] ${
+              isHomeActive ? 'text-brand-offwhite' : 'text-brand-gray hover:text-brand-offwhite'
+            }`}
+            aria-label="Home"
+            aria-current={isHomeActive ? 'page' : undefined}
+          >
+            <Home
+              className="w-5 h-5"
+              strokeWidth={isHomeActive ? 2 : 1.8}
+            />
+            <span className="text-[9px] tracking-[0.12em] uppercase font-body font-semibold">
+              Home
+            </span>
+          </Link>
 
-          <div className="relative flex items-center justify-between px-2.5 py-2">
-            
-            {/* 1. Home Tab */}
-            <Link
-              href="/"
-              className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-full transition-all duration-300 min-w-[56px] ${
-                isHomeActive ? 'bg-brand-graphite/40' : ''
-              }`}
-              aria-label="Home"
-              aria-current={isHomeActive ? 'page' : undefined}
-            >
-              <Home
-                className={`w-4 h-4 transition-all duration-300 ${
-                  isHomeActive ? 'stroke-brand-offwhite scale-105' : 'stroke-brand-gray'
-                }`}
-                strokeWidth={isHomeActive ? 2 : 1.8}
+          {/* 2. Shop Tab */}
+          <Link
+            href="/shop"
+            className={`flex flex-col items-center gap-1 py-2 rounded-none transition-colors duration-200 flex-1 min-w-[56px] ${
+              isShopActive ? 'text-brand-offwhite' : 'text-brand-gray hover:text-brand-offwhite'
+            }`}
+            aria-label="Shop"
+            aria-current={isShopActive ? 'page' : undefined}
+          >
+            <ShoppingBag
+              className="w-5 h-5"
+              strokeWidth={isShopActive ? 2 : 1.8}
+            />
+            <span className="text-[9px] tracking-[0.12em] uppercase font-body font-semibold">
+              Shop
+            </span>
+          </Link>
+
+          {/* 3. Search Tab */}
+          <button
+            onClick={() => setSearchOpen(true)}
+            className={`flex flex-col items-center gap-1 py-2 rounded-none transition-colors duration-200 flex-1 min-w-[56px] ${
+              searchOpen ? 'text-brand-offwhite' : 'text-brand-gray hover:text-brand-offwhite'
+            }`}
+            aria-label="Search items"
+          >
+            <Search className="w-5 h-5" strokeWidth={searchOpen ? 2 : 1.8} />
+            <span className="text-[9px] tracking-[0.12em] uppercase font-body font-semibold">
+              Search
+            </span>
+          </button>
+
+          {/* 4. Bag Tab */}
+          <button
+            id="mobile-cart-trigger"
+            onClick={() => setIsOpen(true)}
+            className={`flex flex-col items-center gap-1 py-2 rounded-none transition-colors duration-200 flex-1 min-w-[56px] relative ${
+              cartPulseActive ? 'text-brand-red' : 'text-brand-gray hover:text-brand-offwhite'
+            }`}
+            aria-label={`Open cart${cartCount > 0 ? `, ${cartCount} items` : ''}`}
+          >
+            <div className="relative">
+              <Package
+                className="w-5 h-5"
+                strokeWidth={cartPulseActive ? 2 : 1.8}
               />
-              <span
-                className={`text-[8px] tracking-[0.12em] uppercase font-body font-semibold transition-colors duration-300 ${
-                  isHomeActive ? 'text-brand-offwhite' : 'text-brand-gray'
-                }`}
-              >
-                Home
-              </span>
-            </Link>
-
-            {/* 2. Shop Tab (Emphasized Primary Action Button) */}
-            <Link
-              href="/shop"
-              className={`flex flex-col items-center gap-0.5 px-3.5 py-2 rounded-full transition-all duration-300 min-w-[62px] ${
-                isShopActive
-                  ? 'bg-brand-amber text-brand-black shadow-[0_0_15px_rgba(201,123,58,0.35)] scale-105 border border-brand-amber/30'
-                  : 'border border-brand-graphite/40 bg-brand-charcoal/45 text-brand-stone hover:text-brand-offwhite'
-              }`}
-              aria-label="Shop"
-              aria-current={isShopActive ? 'page' : undefined}
-            >
-              <ShoppingBag
-                className={`w-4 h-4 transition-all duration-300 ${
-                  isShopActive ? 'stroke-brand-black scale-105' : 'stroke-brand-stone'
-                }`}
-                strokeWidth={isShopActive ? 2.2 : 1.8}
-              />
-              <span
-                className={`text-[8px] tracking-[0.12em] uppercase font-body font-bold transition-colors duration-300 ${
-                  isShopActive ? 'text-brand-black' : 'text-brand-stone'
-                }`}
-              >
-                Shop
-              </span>
-            </Link>
-
-            {/* 3. Search Tab (High-Frequency Action Tab replacing Track tab) */}
-            <button
-              onClick={() => setSearchOpen(true)}
-              className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-full transition-all duration-300 min-w-[56px] text-brand-gray hover:text-brand-offwhite"
-              aria-label="Search items"
-            >
-              <Search className="w-4 h-4 stroke-brand-gray" strokeWidth={1.8} />
-              <span className="text-[8px] tracking-[0.12em] uppercase font-body font-semibold text-brand-gray">
-                Search
-              </span>
-            </button>
-
-            {/* 4. Bag Tab */}
-            <button
-              id="mobile-cart-trigger"
-              onClick={() => setIsOpen(true)}
-              className={`flex flex-col items-center gap-0.5 px-3 py-2 rounded-full transition-all duration-200 min-w-[56px] relative ${
-                cartPulseActive ? 'scale-110' : ''
-              }`}
-              aria-label={`Open cart${cartCount > 0 ? `, ${cartCount} items` : ''}`}
-            >
-              <div className="relative">
-                <Package
-                  className={`w-4 h-4 transition-colors duration-200 ${
-                    cartPulseActive ? 'stroke-brand-red' : 'stroke-brand-gray'
-                  }`}
-                  strokeWidth={cartPulseActive ? 2 : 1.8}
-                />
-                {cartCount > 0 && (
-                  <span
-                    className="absolute -top-1.5 -right-2 bg-brand-red text-white text-[7.5px] font-extrabold w-3.5 h-3.5 rounded-full flex items-center justify-center animate-scale-in"
-                    aria-hidden="true"
-                  >
-                    {cartCount}
-                  </span>
-                )}
-              </div>
-              <span
-                className={`text-[8px] tracking-[0.12em] uppercase font-body font-semibold transition-colors duration-200 ${
-                  cartPulseActive ? 'text-brand-red' : 'text-brand-gray'
-                }`}
-              >
-                Bag
-              </span>
-            </button>
-
-            {/* 5. Me Tab */}
-            <div className="flex flex-col items-center justify-center px-3 py-2 min-w-[56px]">
-              {isLoaded && !isSignedIn && (
-                <SignInButton mode="modal">
-                  <button
-                    className="flex flex-col items-center gap-0.5 text-brand-gray hover:text-brand-offwhite transition-colors"
-                    aria-label="Sign in to your account"
-                  >
-                    <User className="w-4 h-4 stroke-[1.8]" />
-                    <span className="text-[8px] tracking-[0.12em] uppercase font-body font-semibold">Login</span>
-                  </button>
-                </SignInButton>
-              )}
-              {isLoaded && isSignedIn && (
-                <div className="flex flex-col items-center gap-0.5">
-                  <UserButton
-                    appearance={{
-                      elements: {
-                        userButtonAvatarBox: 'w-5 h-5 rounded-full border border-brand-muted',
-                      },
-                    }}
-                  >
-                    <UserButton.MenuItems>
-                      <UserButton.Action
-                        label="Track Order"
-                        labelIcon={<Truck className="w-3.5 h-3.5" />}
-                        onClick={() => router.push('/track')}
-                      />
-                    </UserButton.MenuItems>
-                  </UserButton>
-                  <span className="text-[8px] tracking-[0.12em] uppercase font-body font-semibold text-brand-gray">Me</span>
-                </div>
+              {cartCount > 0 && (
+                <span
+                  className="absolute -top-1.5 -right-2 bg-brand-red text-white text-[7.5px] font-extrabold w-3.5 h-3.5 rounded-full flex items-center justify-center animate-scale-in"
+                  aria-hidden="true"
+                >
+                  {cartCount}
+                </span>
               )}
             </div>
+            <span className="text-[9px] tracking-[0.12em] uppercase font-body font-semibold">
+              Bag
+            </span>
+          </button>
 
+          {/* 5. Me Tab */}
+          <div className="flex-1 flex flex-col items-center justify-center py-2 min-w-[56px]">
+            {isLoaded && !isSignedIn && (
+              <SignInButton mode="modal">
+                <button
+                  className="flex flex-col items-center gap-1 text-brand-gray hover:text-brand-offwhite transition-colors"
+                  aria-label="Sign in to your account"
+                >
+                  <User className="w-5 h-5" strokeWidth={1.8} />
+                  <span className="text-[9px] tracking-[0.12em] uppercase font-body font-semibold">Me</span>
+                </button>
+              </SignInButton>
+            )}
+            {isLoaded && isSignedIn && (
+              <div className="flex flex-col items-center gap-1">
+                <UserButton
+                  appearance={{
+                    elements: {
+                      userButtonAvatarBox: 'w-5 h-5 rounded-full border border-brand-muted',
+                    },
+                  }}
+                >
+                  <UserButton.MenuItems>
+                    <UserButton.Action
+                      label="Track Order"
+                      labelIcon={<Truck className="w-3.5 h-3.5" />}
+                      onClick={() => router.push('/track')}
+                    />
+                  </UserButton.MenuItems>
+                </UserButton>
+                <span className="text-[9px] tracking-[0.12em] uppercase font-body font-semibold text-brand-gray">Me</span>
+              </div>
+            )}
           </div>
+
         </div>
       </nav>
 

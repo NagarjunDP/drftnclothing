@@ -21,7 +21,10 @@ export const dbService = {
         name: r.name,
         slug: r.slug,
         image_url: r.image_url || '',
+        description: r.description || '',
+        parent_id: r.parent_id || null,
         is_active: r.is_active,
+        display_order: r.display_order || 0,
         created_at: r.created_at.toISOString(),
       }));
     } else {
@@ -48,7 +51,10 @@ export const dbService = {
         name: r.name,
         slug: r.slug,
         image_url: r.image_url || '',
+        description: r.description || '',
+        parent_id: r.parent_id || null,
         is_active: r.is_active,
+        display_order: r.display_order || 0,
         created_at: r.created_at.toISOString(),
       }));
     } else {
@@ -70,7 +76,10 @@ export const dbService = {
           name: cat.name,
           slug: cat.slug,
           image_url: cat.image_url,
+          description: cat.description,
+          parent_id: cat.parent_id,
           is_active: cat.is_active !== undefined ? cat.is_active : true,
+          display_order: cat.display_order !== undefined ? cat.display_order : 0,
         })
         .returning();
       
@@ -79,7 +88,10 @@ export const dbService = {
         name: inserted.name,
         slug: inserted.slug,
         image_url: inserted.image_url || '',
+        description: inserted.description || '',
+        parent_id: inserted.parent_id || null,
         is_active: inserted.is_active,
+        display_order: inserted.display_order || 0,
         created_at: inserted.created_at.toISOString(),
       };
     } else {
@@ -106,7 +118,10 @@ export const dbService = {
           name: updates.name,
           slug: updates.slug,
           image_url: updates.image_url,
+          description: updates.description,
+          parent_id: updates.parent_id,
           is_active: updates.is_active,
+          display_order: updates.display_order,
           updated_at: new Date(),
         })
         .where(eq(schema.categories.id, id))
@@ -119,7 +134,10 @@ export const dbService = {
         name: updated.name,
         slug: updated.slug,
         image_url: updated.image_url || '',
+        description: updated.description || '',
+        parent_id: updated.parent_id || null,
         is_active: updated.is_active,
+        display_order: updated.display_order || 0,
         created_at: updated.created_at.toISOString(),
       };
     } else {
@@ -150,7 +168,10 @@ export const dbService = {
       const res = await fetch(`/api/admin/categories?id=${id}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error('Failed to delete category');
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to delete category');
+      }
       const data = await res.json();
       return data.success;
     }
@@ -163,13 +184,28 @@ export const dbService = {
     if (typeof window === 'undefined') {
       const { db } = await import('@/db');
       const schema = await import('@/db/schema');
-      const { eq, desc } = await import('drizzle-orm');
+      const { eq, desc, inArray, asc } = await import('drizzle-orm');
       
       const results = await db
         .select()
         .from(schema.products)
         .where(eq(schema.products.is_active, true))
         .orderBy(desc(schema.products.created_at));
+      
+      if (results.length === 0) return [];
+
+      const productIds = results.map((r: any) => r.id);
+      const allImages = await db
+        .select()
+        .from(schema.productImages)
+        .where(inArray(schema.productImages.product_id, productIds))
+        .orderBy(asc(schema.productImages.sort_order));
+
+      const imagesByProductId = allImages.reduce((acc: Record<string, string[]>, img: any) => {
+        if (!acc[img.product_id]) acc[img.product_id] = [];
+        acc[img.product_id].push(img.image_url);
+        return acc;
+      }, {} as Record<string, string[]>);
       
       return results.map((r: any) => ({
         id: r.id,
@@ -181,7 +217,7 @@ export const dbService = {
         category: r.category,
         subcategory: r.subcategory || undefined,
         gender: r.gender,
-        images: r.images,
+        images: imagesByProductId[r.id] || [],
         sizes: r.sizes,
         stock_quantity: r.stock_quantity,
         is_featured: r.is_featured,
@@ -200,12 +236,27 @@ export const dbService = {
     if (typeof window === 'undefined') {
       const { db } = await import('@/db');
       const schema = await import('@/db/schema');
-      const { desc } = await import('drizzle-orm');
+      const { desc, inArray, asc } = await import('drizzle-orm');
       
       const results = await db
         .select()
         .from(schema.products)
         .orderBy(desc(schema.products.created_at));
+      
+      if (results.length === 0) return [];
+
+      const productIds = results.map((r: any) => r.id);
+      const allImages = await db
+        .select()
+        .from(schema.productImages)
+        .where(inArray(schema.productImages.product_id, productIds))
+        .orderBy(asc(schema.productImages.sort_order));
+
+      const imagesByProductId = allImages.reduce((acc: Record<string, string[]>, img: any) => {
+        if (!acc[img.product_id]) acc[img.product_id] = [];
+        acc[img.product_id].push(img.image_url);
+        return acc;
+      }, {} as Record<string, string[]>);
       
       return results.map((r: any) => ({
         id: r.id,
@@ -217,7 +268,7 @@ export const dbService = {
         category: r.category,
         subcategory: r.subcategory || undefined,
         gender: r.gender,
-        images: r.images,
+        images: imagesByProductId[r.id] || [],
         sizes: r.sizes,
         stock_quantity: r.stock_quantity,
         is_featured: r.is_featured,
@@ -236,7 +287,7 @@ export const dbService = {
     if (typeof window === 'undefined') {
       const { db } = await import('@/db');
       const schema = await import('@/db/schema');
-      const { eq, and } = await import('drizzle-orm');
+      const { eq, and, asc } = await import('drizzle-orm');
       
       const [prod] = await db
         .select()
@@ -249,6 +300,12 @@ export const dbService = {
       
       if (!prod) return null;
 
+      const productImgs = await db
+        .select()
+        .from(schema.productImages)
+        .where(eq(schema.productImages.product_id, prod.id))
+        .orderBy(asc(schema.productImages.sort_order));
+
       return {
         id: prod.id,
         name: prod.name,
@@ -259,7 +316,7 @@ export const dbService = {
         category: prod.category,
         subcategory: prod.subcategory || undefined,
         gender: prod.gender,
-        images: prod.images,
+        images: productImgs.map((img: any) => img.image_url),
         sizes: prod.sizes,
         stock_quantity: prod.stock_quantity,
         is_featured: prod.is_featured,
@@ -287,17 +344,27 @@ export const dbService = {
           slug: prod.slug,
           description: prod.description,
           price: prod.price,
-          compare_price: prod.compare_price,
+          compare_price: prod.compare_price || null,
           category: prod.category,
-          subcategory: prod.subcategory,
+          subcategory: prod.subcategory || null,
           gender: prod.gender,
-          images: prod.images,
           sizes: prod.sizes,
           stock_quantity: prod.stock_quantity,
           is_featured: prod.is_featured !== undefined ? prod.is_featured : false,
           is_active: prod.is_active !== undefined ? prod.is_active : true,
         })
         .returning();
+
+      if (prod.images && prod.images.length > 0) {
+        await db.insert(schema.productImages).values(
+          prod.images.map((img, index) => ({
+            product_id: inserted.id,
+            image_url: img,
+            sort_order: index,
+            alt_text: `${inserted.name} - Image ${index + 1}`
+          }))
+        );
+      }
 
       return {
         id: inserted.id,
@@ -309,7 +376,7 @@ export const dbService = {
         category: inserted.category,
         subcategory: inserted.subcategory || undefined,
         gender: inserted.gender,
-        images: inserted.images,
+        images: prod.images,
         sizes: inserted.sizes,
         stock_quantity: inserted.stock_quantity,
         is_featured: inserted.is_featured,
@@ -332,18 +399,40 @@ export const dbService = {
     if (typeof window === 'undefined') {
       const { db } = await import('@/db');
       const schema = await import('@/db/schema');
-      const { eq } = await import('drizzle-orm');
+      const { eq, asc } = await import('drizzle-orm');
       
+      const { images, ...productFields } = updates;
+
       const [updated] = await db
         .update(schema.products)
         .set({
-          ...updates,
+          ...productFields,
           updated_at: new Date(),
         })
         .where(eq(schema.products.id, id))
         .returning();
 
       if (!updated) throw new Error('Product not found');
+
+      if (images !== undefined) {
+        await db.delete(schema.productImages).where(eq(schema.productImages.product_id, id));
+        if (images.length > 0) {
+          await db.insert(schema.productImages).values(
+            images.map((img, index) => ({
+              product_id: id,
+              image_url: img,
+              sort_order: index,
+              alt_text: `${updated.name} - Image ${index + 1}`
+            }))
+          );
+        }
+      }
+
+      const productImgs = await db
+        .select()
+        .from(schema.productImages)
+        .where(eq(schema.productImages.product_id, id))
+        .orderBy(asc(schema.productImages.sort_order));
 
       return {
         id: updated.id,
@@ -355,7 +444,7 @@ export const dbService = {
         category: updated.category,
         subcategory: updated.subcategory || undefined,
         gender: updated.gender,
-        images: updated.images,
+        images: productImgs.map((img: any) => img.image_url),
         sizes: updated.sizes,
         stock_quantity: updated.stock_quantity,
         is_featured: updated.is_featured,

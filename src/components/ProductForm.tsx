@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Product } from '@/types';
-import { ArrowLeft, Trash2, ArrowLeftRight, Upload, Sparkles, MoveLeft, MoveRight } from 'lucide-react';
+import { Product, Category } from '@/types';
+import { ArrowLeft, Trash2, ArrowLeftRight, Upload, Sparkles, MoveLeft, MoveRight, Star, HelpCircle } from 'lucide-react';
 import { useToast } from '@/components/ToastContainer';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/db';
@@ -13,7 +13,6 @@ interface ProductFormProps {
 }
 
 const AVAILABLE_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'] as const;
-const CATEGORIES = ['tees', 'hoodies', 'joggers', 'accessories'] as const;
 const GENDERS = ['unisex', 'men', 'women'] as const;
 
 export default function ProductForm({ initialData, mode }: ProductFormProps) {
@@ -25,7 +24,8 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState(''); // in Rupees (e.g., 1299)
   const [comparePrice, setComparePrice] = useState(''); // in Rupees
-  const [category, setCategory] = useState<typeof CATEGORIES[number]>('tees');
+  const [category, setCategory] = useState('');
+  const [subcategory, setSubcategory] = useState('');
   const [gender, setGender] = useState<typeof GENDERS[number]>('unisex');
   const [images, setImages] = useState<string[]>([]);
   const [activeSizes, setActiveSizes] = useState<string[]>(['S', 'M', 'L']);
@@ -40,8 +40,26 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
   const [isFeatured, setIsFeatured] = useState(false);
   const [isActive, setIsActive] = useState(true);
 
+  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<Array<{ name: string; progress: number }>>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Native Drag and Drop State
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
+  // Fetch categories on load
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const data = await db.getAllCategories();
+        setCategoriesList(data);
+      } catch (err) {
+        console.error('Failed to load categories:', err);
+      }
+    }
+    loadCategories();
+  }, []);
 
   // Pre-populate if editing
   useEffect(() => {
@@ -51,7 +69,8 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
       setDescription(initialData.description || '');
       setPrice((initialData.price / 100).toString());
       setComparePrice(initialData.compare_price ? (initialData.compare_price / 100).toString() : '');
-      setCategory(initialData.category as any);
+      setCategory(initialData.category || '');
+      setSubcategory(initialData.subcategory || '');
       setGender(initialData.gender as any);
       setImages(initialData.images || []);
       setActiveSizes(initialData.sizes || []);
@@ -102,62 +121,97 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
     }));
   };
 
-  // Image Upload handler calling direct signed upload to Cloudinary
+  // Image Upload handler with client validations & upload progress
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    const validFiles: File[] = [];
+    const errors: string[] = [];
+
+    // Client-side format and size checks
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (file.size > 5 * 1024 * 1024) {
+        errors.push(`"${file.name}" exceeds 5MB size limit.`);
+        continue;
+      }
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        errors.push(`"${file.name}" has invalid format. Use JPEG, PNG, or WebP.`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (errors.length > 0) {
+      errors.forEach((err) => addToast(err, 'error'));
+    }
+
+    if (validFiles.length === 0) return;
+
     setIsUploading(true);
-    const uploadedUrls: string[] = [];
+    setUploadingFiles(validFiles.map(f => ({ name: f.name, progress: 0 })));
 
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
     if (!cloudName) {
-      addToast('Cloudinary is not configured. (Missing NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME env)', 'error');
+      addToast('Cloudinary is not configured.', 'error');
       setIsUploading(false);
       return;
     }
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    const uploadedUrls: string[] = [];
+
+    for (let i = 0; i < validFiles.length; i++) {
+      const file = validFiles[i];
       const timestamp = Math.round(new Date().getTime() / 1000);
       const folder = 'drftn-products';
 
       try {
-        // Fetch signature from secure backend
         const signRes = await fetch('/api/admin/cloudinary-sign', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            params: { timestamp, folder }
-          })
+          body: JSON.stringify({ params: { timestamp, folder } })
         });
 
-        if (!signRes.ok) {
-          throw new Error('Failed to fetch upload signature');
-        }
-
+        if (!signRes.ok) throw new Error('Failed to get signature');
         const signData = await signRes.json();
 
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('api_key', signData.apiKey);
-        formData.append('timestamp', String(timestamp));
-        formData.append('signature', signData.signature);
-        formData.append('folder', folder);
+        // Perform XHR request to track real-time upload progress percentage
+        const url = await new Promise<string>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('api_key', signData.apiKey);
+          formData.append('timestamp', String(timestamp));
+          formData.append('signature', signData.signature);
+          formData.append('folder', folder);
 
-        // Post directly to Cloudinary
-        const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-          method: 'POST',
-          body: formData,
+          xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) {
+              const progress = Math.round((event.loaded / event.total) * 100);
+              setUploadingFiles(prev => 
+                prev.map((f, idx) => idx === i ? { ...f, progress } : f)
+              );
+            }
+          });
+
+          xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              const res = JSON.parse(xhr.responseText);
+              resolve(res.secure_url);
+            } else {
+              reject(new Error('Cloudinary response error'));
+            }
+          });
+
+          xhr.addEventListener('error', () => reject(new Error('Network error')));
+          xhr.addEventListener('abort', () => reject(new Error('Upload aborted')));
+
+          xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`);
+          xhr.send(formData);
         });
 
-        if (!uploadRes.ok) {
-          throw new Error('Cloudinary response error');
-        }
-
-        const uploadData = await uploadRes.json();
-        // Apply Cloudinary transformations for format and quality optimizations
-        const optimizedUrl = uploadData.secure_url.replace('/upload/', '/upload/f_auto,q_auto/');
+        const optimizedUrl = url.replace('/upload/', '/upload/f_auto,q_auto/');
         uploadedUrls.push(optimizedUrl);
       } catch (err) {
         console.error(err);
@@ -170,21 +224,42 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
       addToast(`${uploadedUrls.length} image(s) uploaded successfully`, 'success');
     }
     setIsUploading(false);
+    setUploadingFiles([]);
   };
 
   const removeImage = (index: number) => {
     setImages((prev) => prev.filter((_, i) => i !== index));
+    addToast('Image removed from collection', 'info');
   };
 
-  const moveImage = (index: number, direction: 'left' | 'right') => {
-    const targetIdx = direction === 'left' ? index - 1 : index + 1;
-    if (targetIdx < 0 || targetIdx >= images.length) return;
+  // Reordering grid handlers (native HTML5 drag-and-drop)
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (index: number) => {
+    if (draggedIndex === null || draggedIndex === index) return;
     const reordered = [...images];
-    const temp = reordered[index];
-    reordered[index] = reordered[targetIdx];
-    reordered[targetIdx] = temp;
+    const draggedItem = reordered[draggedIndex];
+    reordered.splice(draggedIndex, 1);
+    reordered.splice(index, 0, draggedItem);
     setImages(reordered);
+    setDraggedIndex(null);
+    addToast('Image order updated', 'info');
+  };
+
+  const makePrimary = (index: number) => {
+    if (index === 0) return;
+    const reordered = [...images];
+    const target = reordered[index];
+    reordered.splice(index, 1);
+    reordered.unshift(target);
+    setImages(reordered);
+    addToast('Cover image updated successfully', 'success');
   };
 
   // Submit Handler
@@ -214,6 +289,7 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
         price: Math.round(Number(price) * 100), // convert to paise
         compare_price: comparePrice ? Math.round(Number(comparePrice) * 100) : undefined, // convert to paise
         category,
+        subcategory: subcategory || null,
         gender,
         images,
         sizes: activeSizes,
@@ -368,13 +444,25 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
           {/* Cloudinary Image Uploader */}
           <div className="bg-zinc-900/30 border border-zinc-800 p-6 md:p-8 space-y-6">
             <div>
-              <h2 className="text-sm font-bold text-brand-offwhite uppercase tracking-widest">Product Media</h2>
+              <h2 className="text-sm font-bold text-brand-offwhite uppercase tracking-widest flex items-center gap-2">
+                Product Media
+                <span className="text-[10px] text-zinc-500 font-normal lowercase">(JPEG, PNG, WebP — max 5MB per file)</span>
+              </h2>
               <p className="text-xs text-zinc-500 mt-1">Upload multiple product images. First image is used as main thumbnail.</p>
             </div>
 
             <div className="space-y-6">
-              {/* Drop area */}
-              <label className="border-2 border-dashed border-zinc-800 hover:border-zinc-700 bg-zinc-950/20 hover:bg-zinc-950/40 p-8 text-center rounded-lg cursor-pointer flex flex-col items-center justify-center gap-2 group transition-all duration-300">
+              {/* Drag and Drop Upload Area */}
+              <label 
+                className="border-2 border-dashed border-zinc-800 hover:border-zinc-700 bg-zinc-950/20 hover:bg-zinc-950/40 p-8 text-center rounded-lg cursor-pointer flex flex-col items-center justify-center gap-2 group transition-all duration-300"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (e.dataTransfer.files) {
+                    handleImageUpload({ target: { files: e.dataTransfer.files } } as any);
+                  }
+                }}
+              >
                 <input
                   type="file"
                   multiple
@@ -390,56 +478,103 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
                 <span className="text-[10px] text-zinc-500">Drag & drop files or click to browse</span>
               </label>
 
-              {/* Preview List */}
-              {images.length > 0 && (
-                <div className="space-y-3">
-                  <span className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Uploaded Images ({images.length})</span>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    {images.map((url, idx) => (
-                      <div key={url} className="relative aspect-[3/4] bg-zinc-950 border border-zinc-800 group rounded-md overflow-hidden">
-                        <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover" />
-                        
-                        {/* Indicators & controls */}
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-between p-2">
-                          <div className="flex justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => removeImage(idx)}
-                              className="p-1.5 bg-brand-black/80 hover:bg-brand-red text-zinc-400 hover:text-white rounded transition-colors"
-                              title="Delete Image"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                          <div className="flex items-center justify-between text-[10px] font-bold text-zinc-400">
-                            <span>{idx === 0 ? 'COVER' : `#${idx + 1}`}</span>
-                            <div className="flex gap-1">
-                              {idx > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => moveImage(idx, 'left')}
-                                  className="p-1 bg-brand-black/80 hover:bg-brand-offwhite hover:text-brand-black rounded transition-colors"
-                                  title="Move Left"
-                                >
-                                  <MoveLeft className="w-3 h-3" />
-                                </button>
-                              )}
-                              {idx < images.length - 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => moveImage(idx, 'right')}
-                                  className="p-1 bg-brand-black/80 hover:bg-brand-offwhite hover:text-brand-black rounded transition-colors"
-                                  title="Move Right"
-                                >
-                                  <MoveRight className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
+              {/* Progress Bar View */}
+              {uploadingFiles.length > 0 && (
+                <div className="space-y-3 bg-zinc-950 p-4 border border-zinc-850 rounded">
+                  <span className="text-xs uppercase font-bold text-zinc-400 font-mono tracking-wider block">Uploading Files ({uploadingFiles.length})</span>
+                  <div className="space-y-2">
+                    {uploadingFiles.map((file, idx) => (
+                      <div key={idx} className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-zinc-400 font-mono">
+                          <span className="truncate max-w-[200px]">{file.name}</span>
+                          <span>{file.progress}%</span>
+                        </div>
+                        <div className="w-full bg-zinc-900 h-1 rounded-full overflow-hidden">
+                          <div 
+                            className="bg-brand-red h-full transition-all duration-200" 
+                            style={{ width: `${file.progress}%` }}
+                          />
                         </div>
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Preview Thumbnail Grid */}
+              {images.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Uploaded Images ({images.length})</span>
+                    <div className="group relative flex items-center">
+                      <HelpCircle className="w-3.5 h-3.5 text-zinc-500 cursor-help" />
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-zinc-900 border border-zinc-800 text-[10px] text-zinc-400 leading-normal rounded shadow-xl hidden group-hover:block z-50 font-normal">
+                        Drag thumbnails horizontally to reorder gallery. Click star to set main listing cover image.
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {images.map((url, idx) => {
+                      const isDragTarget = draggedIndex !== null && draggedIndex !== idx;
+                      return (
+                        <div 
+                          key={url} 
+                          draggable
+                          onDragStart={() => handleDragStart(idx)}
+                          onDragOver={handleDragOver}
+                          onDrop={() => handleDrop(idx)}
+                          className={`relative aspect-[3/4] bg-zinc-950 border border-zinc-800 group rounded-md overflow-hidden cursor-move transition-all duration-300 ${
+                            draggedIndex === idx ? 'opacity-40 scale-95 border-brand-red' : ''
+                          } ${isDragTarget ? 'hover:border-zinc-500' : ''}`}
+                        >
+                          <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover select-none pointer-events-none" />
+                          
+                          {/* Top-left Indicator (Cover status) */}
+                          {idx === 0 && (
+                            <div className="absolute top-2 left-2 bg-brand-red text-white text-[9px] font-bold px-1.5 py-0.5 rounded font-mono uppercase tracking-wider shadow">
+                              Cover
+                            </div>
+                          )}
+
+                          {/* Hover Action Controls */}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-between p-2">
+                            <div className="flex justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => removeImage(idx)}
+                                className="p-1.5 bg-brand-black/80 hover:bg-brand-red text-zinc-400 hover:text-white rounded transition-colors"
+                                title="Delete Image"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            
+                            <div className="flex items-center justify-between text-[10px] font-bold text-zinc-400">
+                              <button
+                                type="button"
+                                onClick={() => makePrimary(idx)}
+                                className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors text-[9px] font-bold uppercase tracking-wider ${
+                                  idx === 0
+                                    ? 'bg-brand-red text-white'
+                                    : 'bg-brand-black/80 hover:bg-brand-offwhite hover:text-brand-black text-zinc-400'
+                                }`}
+                                title={idx === 0 ? 'Primary Image' : 'Make Primary Cover'}
+                              >
+                                <Star className="w-3 h-3 fill-current" />
+                                <span>Cover</span>
+                              </button>
+                              
+                              <span className="font-mono text-[9px] bg-zinc-950/80 px-1 py-0.5 rounded">#{idx + 1}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-zinc-650 italic mt-2">
+                    * Tip: Drag and drop preview frames to adjust sequence order on the product details page.
+                  </p>
                 </div>
               )}
             </div>
@@ -500,16 +635,44 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
               <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Category</label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value as any)}
+                onChange={(e) => {
+                  setCategory(e.target.value);
+                  setSubcategory(''); // Reset subcategory when category changes
+                }}
                 className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors uppercase tracking-wider font-bold"
+                required
               >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
+                <option value="" disabled>[Select Category]</option>
+                {categoriesList.filter(c => !c.parent_id && c.is_active).map((cat) => (
+                  <option key={cat.id} value={cat.slug}>
+                    {cat.name}
                   </option>
                 ))}
               </select>
             </div>
+
+            {category && (() => {
+              const currentParent = categoriesList.find(c => c.slug === category);
+              const subs = currentParent ? categoriesList.filter(c => c.parent_id === currentParent.id && c.is_active) : [];
+              if (subs.length === 0) return null;
+              return (
+                <div className="space-y-2">
+                  <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Subcategory</label>
+                  <select
+                    value={subcategory}
+                    onChange={(e) => setSubcategory(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors uppercase tracking-wider font-bold"
+                  >
+                    <option value="">[None] — No Subcategory</option>
+                    {subs.map((sub) => (
+                      <option key={sub.id} value={sub.slug}>
+                        {sub.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })()}
 
             <div className="space-y-2">
               <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Gender targeting</label>

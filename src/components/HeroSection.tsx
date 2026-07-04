@@ -104,14 +104,41 @@ export default function HeroSection({
                   : 'opacity-0 scale-100'
               }`}
             >
-              <Image
-                src={img}
-                alt={`DRFTN Campaign lookbook visual ${i + 1}`}
-                fill
-                priority={i === 0}
-                sizes="(max-width: 768px) 100vw, 60vw"
-                className="object-cover object-center"
-              />
+              {i === 0 ? (
+                <>
+                  {/* Mobile portrait responsive image: centers model concrete backdrop */}
+                  <div className="block md:hidden absolute inset-0">
+                    <Image
+                      src="https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=1000&auto=format&fit=crop&q=80"
+                      alt="DRFTN Campaign lookbook visual mobile"
+                      fill
+                      priority
+                      sizes="100vw"
+                      className="object-cover object-[center_35%]"
+                    />
+                  </div>
+                  {/* Desktop landscape image: original grid wallpaper */}
+                  <div className="hidden md:block absolute inset-0">
+                    <Image
+                      src={img}
+                      alt={`DRFTN Campaign lookbook visual ${i + 1}`}
+                      fill
+                      priority
+                      sizes="60vw"
+                      className="object-cover object-center"
+                    />
+                  </div>
+                </>
+              ) : (
+                <Image
+                  src={img}
+                  alt={`DRFTN Campaign lookbook visual ${i + 1}`}
+                  fill
+                  priority={i === 0}
+                  sizes="(max-width: 768px) 100vw, 60vw"
+                  className="object-cover object-center"
+                />
+              )}
             </div>
           ))}
           {/*
@@ -184,12 +211,12 @@ export default function HeroSection({
           Position: top 16% → stays in upper half, never reaches bottom CTA zone.
           ══════════════════════════════════════════ */}
       <motion.div
-        className="absolute inset-x-0 z-[4] flex justify-center pointer-events-none select-none"
-        style={{ y: textY, top: '16%' }}
+        className="absolute inset-x-0 z-[4] flex justify-start pointer-events-none select-none px-6 md:px-12 lg:px-24 top-[15%] md:top-[20%]"
+        style={{ y: textY }}
         aria-hidden="true"
       >
-        <div className="w-full px-2 sm:px-4">
-          <p className="hero-masked-words font-display uppercase text-center leading-none tracking-[-0.03em]">
+        <div className="max-w-4xl">
+          <p className="hero-masked-words font-display uppercase text-left leading-none tracking-[-0.03em]">
             {WORDS.map((word, i) => (
               <motion.span
                 key={word}
@@ -254,7 +281,7 @@ export default function HeroSection({
           guaranteed non-overlapping with Layer 3 headline above.
           ══════════════════════════════════════════ */}
       <div
-        className="absolute inset-x-0 bottom-0 z-[6] px-6 md:px-12 pb-16 sm:pb-20 md:pb-24"
+        className="absolute inset-x-0 bottom-0 z-[6] px-8 md:px-12 pb-10 sm:pb-20 md:pb-24"
       >
         {/* Screen-reader h1 — visual version is the masked display text above */}
         <h1 className="sr-only">Drift In Style — New Season Drop by DRFTN Clothing</h1>
@@ -263,7 +290,7 @@ export default function HeroSection({
 
           {/* Eyebrow pill */}
           <motion.div
-            className="inline-flex items-center gap-2.5 mb-4"
+            className="hidden md:inline-flex items-center gap-2.5 mb-4"
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, delay: 0.2 }}
@@ -276,7 +303,7 @@ export default function HeroSection({
 
           {/* Subline */}
           <motion.p
-            className="text-brand-stone/80 text-[11px] sm:text-xs md:text-sm tracking-widest leading-relaxed max-w-xs sm:max-w-sm md:max-w-md mb-6 font-body uppercase"
+            className="hidden md:block text-brand-stone/80 text-[11px] sm:text-xs md:text-sm tracking-widest leading-relaxed max-w-xs sm:max-w-sm md:max-w-md mb-6 font-body uppercase"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, delay: 0.5, ease: 'easeOut' }}

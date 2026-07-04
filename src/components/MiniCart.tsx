@@ -124,8 +124,10 @@ export default function MiniCart() {
         role="dialog"
         aria-modal="true"
         aria-label="Shopping bag"
-        className={`fixed top-0 right-0 h-full w-full max-w-sm z-[101] bg-brand-black border-l border-brand-graphite shadow-2xl flex flex-col transition-transform duration-400 ease-streetwear ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
+        className={`fixed top-0 right-0 h-full w-full max-w-sm z-[101] bg-brand-black flex flex-col transition-transform duration-400 ease-streetwear ${
+          isOpen 
+            ? 'translate-x-0 border-l border-brand-graphite shadow-2xl' 
+            : 'translate-x-[105%] border-l-0 shadow-none'
         }`}
       >
         {/* ── Shipping Progress Bar (very top) ── */}

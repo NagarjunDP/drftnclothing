@@ -205,7 +205,7 @@ export default function Navbar() {
             <button
               id="navbar-cart-btn"
               onClick={() => setIsOpen(true)}
-              className={`relative flex items-center transition-all duration-200 group ${cartPulseActive ? 'scale-125 text-brand-red' : 'text-brand-silver hover:text-brand-offwhite'
+              className={`relative flex items-center transition-all duration-200 group p-3 -mr-3 ${cartPulseActive ? 'scale-125 text-brand-red' : 'text-brand-silver hover:text-brand-offwhite'
                 }`}
               aria-label={`Open cart${mounted && cartCount > 0 ? `, ${cartCount} items` : ''}`}
             >
@@ -224,7 +224,7 @@ export default function Navbar() {
             <button
               id="navbar-mobile-menu-btn"
               onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden text-brand-silver hover:text-brand-offwhite transition-colors p-1"
+              className="hidden text-brand-silver hover:text-brand-offwhite transition-colors p-1"
               aria-label="Open navigation menu"
               aria-expanded={mobileMenuOpen}
               aria-controls="mobile-menu"
@@ -236,7 +236,7 @@ export default function Navbar() {
 
         {/* ── Category Strip — integrated second row of navigation (hidden on checkout/shop) ── */}
         {!isCheckoutPage && !isShopPage && (
-          <div className="relative w-full border-t border-brand-graphite/40 bg-brand-black/90 backdrop-blur-md">
+          <div className="relative w-full border-t border-brand-graphite/40 bg-brand-black/90 backdrop-blur-md hidden md:block">
             {/* Left and Right Visual Fading Gradients for Scrolling indication */}
             <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-brand-black to-transparent pointer-events-none z-10" />
             <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-brand-black to-transparent pointer-events-none z-10" />

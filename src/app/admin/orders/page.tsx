@@ -70,55 +70,127 @@ export default function AdminOrders() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div>
           {isLoading ? (
             <div className="p-8 text-center text-zinc-500 text-sm">Loading orders...</div>
           ) : (
-            <table className="w-full text-left border-collapse min-w-[800px]">
-              <thead>
-                <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Order</th>
-                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Date</th>
-                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Customer</th>
-                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Payment</th>
-                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Status</th>
-                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Total</th>
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[800px]">
+                  <thead>
+                    <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                      <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Order</th>
+                      <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Date</th>
+                      <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Customer</th>
+                      <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Payment</th>
+                      <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Status</th>
+                      <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-500">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredOrders.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-zinc-500 text-sm">No orders found.</td>
+                      </tr>
+                    ) : (
+                      filteredOrders.map(order => (
+                        <tr 
+                          key={order.id} 
+                          onClick={() => router.push(`/admin/orders/${order.id}`)}
+                          className="border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-colors cursor-pointer"
+                        >
+                          <td className="p-4 font-mono text-sm text-brand-offwhite font-bold">{order.order_number}</td>
+                          <td className="p-4 text-sm text-zinc-400">
+                            {new Date(order.created_at || Date.now()).toLocaleDateString()}
+                          </td>
+                          <td className="p-4">
+                            <p className="text-sm text-brand-offwhite font-bold">{order.customer_name}</p>
+                            <p className="text-xs text-zinc-500">{order.customer_email}</p>
+                          </td>
+                          <td className="p-4">
+                            <span className={`inline-block px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded ${
+                              order.payment_status === 'paid' ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'
+                            }`}>
+                              {order.payment_status}
+                            </span>
+                          </td>
+                          <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                            <div className="relative">
+                              <select
+                                value={order.order_status}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleStatusChange(order.id, e.target.value as any);
+                                }}
+                                className={`appearance-none bg-zinc-900 border px-3 py-1.5 pr-8 text-xs font-bold uppercase tracking-wider rounded cursor-pointer focus:outline-none ${
+                                  order.order_status === 'delivered' ? 'border-green-900 text-green-500' :
+                                  order.order_status === 'cancelled' ? 'border-red-900 text-red-500' :
+                                  'border-zinc-700 text-brand-offwhite'
+                                }`}
+                              >
+                                <option value="placed">Placed</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="packed">Packed</option>
+                                <option value="shipped">Shipped</option>
+                                <option value="delivered">Delivered</option>
+                                <option value="cancelled">Cancelled</option>
+                              </select>
+                              <ChevronDown className="w-3 h-3 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500" />
+                            </div>
+                          </td>
+                          <td className="p-4 font-mono text-sm text-brand-offwhite">₹{(order.total / 100).toFixed(2)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card List View */}
+              <div className="md:hidden divide-y divide-zinc-800">
                 {filteredOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-zinc-500 text-sm">No orders found.</td>
-                  </tr>
+                  <div className="p-8 text-center text-zinc-500 text-sm">No orders found.</div>
                 ) : (
                   filteredOrders.map(order => (
-                    <tr 
-                      key={order.id} 
+                    <div 
+                      key={order.id}
                       onClick={() => router.push(`/admin/orders/${order.id}`)}
-                      className="border-b border-zinc-800/50 hover:bg-zinc-800/20 transition-colors cursor-pointer"
+                      className="p-4 space-y-4 hover:bg-zinc-800/10 active:bg-zinc-800/20 transition-colors cursor-pointer"
                     >
-                      <td className="p-4 font-mono text-sm text-brand-offwhite font-bold">{order.order_number}</td>
-                      <td className="p-4 text-sm text-zinc-400">
-                        {new Date(order.created_at || Date.now()).toLocaleDateString()}
-                      </td>
-                      <td className="p-4">
-                        <p className="text-sm text-brand-offwhite font-bold">{order.customer_name}</p>
-                        <p className="text-xs text-zinc-500">{order.customer_email}</p>
-                      </td>
-                      <td className="p-4">
-                        <span className={`inline-block px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded ${
-                          order.payment_status === 'paid' ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'
-                        }`}>
-                          {order.payment_status}
-                        </span>
-                      </td>
-                      <td className="p-4" onClick={(e) => e.stopPropagation()}>
+                      {/* Top Row: Order Num & Date */}
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-mono text-xs font-black text-brand-offwhite">{order.order_number}</span>
+                          <span className="text-[10px] text-zinc-500 font-bold block mt-0.5">
+                            {new Date(order.created_at || Date.now()).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="font-mono text-sm font-bold text-brand-offwhite block">₹{(order.total / 100).toFixed(2)}</span>
+                          <span className={`inline-block px-1.5 py-0.5 mt-1 text-[8px] font-bold uppercase tracking-wider rounded ${
+                            order.payment_status === 'paid' ? 'bg-green-500/10 text-green-500' : 'bg-yellow-500/10 text-yellow-500'
+                          }`}>
+                            {order.payment_status}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Customer Info */}
+                      <div className="bg-zinc-950/40 p-2.5 border border-zinc-850/40">
+                        <p className="text-xs text-brand-offwhite font-bold">{order.customer_name}</p>
+                        <p className="text-[10px] text-zinc-500 mt-0.5 truncate">{order.customer_email}</p>
+                      </div>
+
+                      {/* Status Dropdown */}
+                      <div className="flex items-center justify-between pt-1" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Change Status</span>
                         <div className="relative">
                           <select
                             value={order.order_status}
                             onChange={(e) => {
                               e.stopPropagation();
-                              handleStatusChange(order.id, e.target.value as Order['order_status']);
+                              handleStatusChange(order.id, e.target.value as any);
                             }}
                             className={`appearance-none bg-zinc-900 border px-3 py-1.5 pr-8 text-xs font-bold uppercase tracking-wider rounded cursor-pointer focus:outline-none ${
                               order.order_status === 'delivered' ? 'border-green-900 text-green-500' :
@@ -135,13 +207,12 @@ export default function AdminOrders() {
                           </select>
                           <ChevronDown className="w-3 h-3 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500" />
                         </div>
-                      </td>
-                      <td className="p-4 font-mono text-sm text-brand-offwhite">₹{(order.total / 100).toFixed(2)}</td>
-                    </tr>
+                      </div>
+                    </div>
                   ))
                 )}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
       </div>

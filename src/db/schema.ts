@@ -7,6 +7,8 @@ export const categories = pgTable('categories', {
   name: text('name').notNull(),
   slug: text('slug').unique().notNull(),
   image_url: text('image_url'),
+  description: text('description'),
+  parent_id: uuid('parent_id').references((): any => categories.id, { onDelete: 'cascade' }),
   is_active: boolean('is_active').notNull().default(true),
   display_order: integer('display_order').notNull().default(0),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -99,5 +101,15 @@ export const contactMessages = pgTable('contact_messages', {
   name: text('name').notNull(),
   email: text('email').notNull(),
   message: text('message').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// 7. Product Images Table
+export const productImages = pgTable('product_images', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  product_id: uuid('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+  image_url: text('image_url').notNull(),
+  sort_order: integer('sort_order').notNull().default(0),
+  alt_text: text('alt_text'),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

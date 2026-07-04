@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export default function AboutPage() {
   return (
-    <div className="max-w-4xl mx-auto px-6 md:px-12 py-16 md:py-24 animate-fade-in">
+    <div className="max-w-4xl mx-auto px-6 md:px-12 py-24 md:py-32 animate-fade-in">
       <div className="text-center mb-16">
         <h1 className="text-4xl md:text-6xl font-extrabold tracking-widest text-brand-offwhite uppercase mb-4">
           About DRFTN

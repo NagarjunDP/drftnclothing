@@ -14,13 +14,11 @@ export default function WhatsAppButton() {
       href="https://wa.me/917406164512?text=Hey%20DRFTN%20CLOTHING!%20I'm%20interested%20in%20your%20streetwear%20collection."
       target="_blank"
       rel="noopener noreferrer"
-      className="fixed bottom-24 md:bottom-8 right-6 z-40 bg-[#25D366] hover:bg-[#20ba56] text-white p-4 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 flex items-center justify-center group"
+      className="fixed bottom-24 md:bottom-8 right-6 z-40 w-12 h-12 bg-[#0A0A0A] border border-zinc-800 hover:border-brand-amber text-brand-offwhite rounded-full shadow-md hover:scale-105 active:scale-95 transition-all duration-300 flex items-center justify-center group"
       aria-label="Chat on WhatsApp"
     >
-      <div className="absolute inset-0 rounded-full bg-[#25D366] opacity-35 animate-ping group-hover:animate-none"></div>
-      {/* Custom WhatsApp SVG or generic chat icon with high quality */}
       <svg
-        className="w-6 h-6 fill-current"
+        className="w-5 h-5 fill-current"
         viewBox="0 0 24 24"
         xmlns="http://www.w3.org/2000/svg"
       >

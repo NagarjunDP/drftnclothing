@@ -19,11 +19,32 @@ export default function CategoryForm({ initialData, mode }: CategoryFormProps) {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [description, setDescription] = useState('');
+  const [parentId, setParentId] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [displayOrder, setDisplayOrder] = useState(0);
 
+  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch top-level categories to allow nesting subcategories
+  useEffect(() => {
+    async function loadParents() {
+      try {
+        const data = await db.getAllCategories();
+        // Do not allow subcategories to have subcategories (only 1 level nested)
+        // Also prevent a category from referencing itself as a parent
+        const filteredParents = data.filter(
+          (c) => !c.parent_id && (mode === 'create' || c.id !== initialData?.id)
+        );
+        setCategoriesList(filteredParents);
+      } catch (err) {
+        console.error('Failed to load parents:', err);
+      }
+    }
+    loadParents();
+  }, [initialData, mode]);
 
   // Pre-populate if editing
   useEffect(() => {
@@ -31,6 +52,8 @@ export default function CategoryForm({ initialData, mode }: CategoryFormProps) {
       setName(initialData.name);
       setSlug(initialData.slug);
       setImageUrl(initialData.image_url || '');
+      setDescription(initialData.description || '');
+      setParentId(initialData.parent_id || '');
       setIsActive(initialData.is_active);
       setDisplayOrder((initialData as any).display_order || 0);
     }
@@ -122,7 +145,9 @@ export default function CategoryForm({ initialData, mode }: CategoryFormProps) {
       const payload = {
         name: name.trim(),
         slug: slug.trim(),
-        image_url: imageUrl,
+        image_url: imageUrl || null,
+        description: description.trim() || null,
+        parent_id: parentId || null,
         is_active: isActive,
         display_order: displayOrder,
       };
@@ -196,6 +221,34 @@ export default function CategoryForm({ initialData, mode }: CategoryFormProps) {
                 onBlur={handleSlugBlur}
                 className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors font-mono"
                 required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Parent Category</label>
+              <select
+                value={parentId}
+                onChange={(e) => setParentId(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors font-bold uppercase tracking-wider"
+              >
+                <option value="">[None] — Set as Top-Level Category</option>
+                {categoriesList.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-zinc-600 font-mono">Select a parent category to create a nested subcategory.</p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Description</label>
+              <textarea
+                placeholder="Describe the collection/category fit or drops..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors resize-none leading-relaxed"
               />
             </div>
             

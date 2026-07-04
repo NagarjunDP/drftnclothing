@@ -21,7 +21,10 @@ export interface Category {
   name: string;
   slug: string;
   image_url: string;
+  description?: string | null;
+  parent_id?: string | null;
   is_active: boolean;
+  display_order: number;
   created_at?: string;
 }
 

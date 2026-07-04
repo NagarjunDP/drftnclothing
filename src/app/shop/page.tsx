@@ -4,9 +4,9 @@ import React, { useEffect, useState, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { SlidersHorizontal, X, ShoppingBag } from 'lucide-react';
+import { ChevronDown, Search, SlidersHorizontal, Grid3X3, Grid2X2, ArrowUpDown, X, Sparkles, Plus, ShoppingBag } from 'lucide-react';
 import { dbService } from '@/lib/db';
-import { Product } from '@/types';
+import { Product, Category } from '@/types';
 import { useCartStore } from '@/lib/cartStore';
 import { useAnimationStore } from '@/lib/animationStore';
 import { toast } from '@/lib/toast';
@@ -15,35 +15,35 @@ import { ProductGridSkeleton } from '@/components/Skeletons';
 const CATEGORY_VISUALS: Record<string, { label: string; image: string }> = {
   all: {
     label: 'All Drops',
-    image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=300&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400&h=400&fit=crop&q=80',
   },
   't-shirts': {
     label: 'Tees',
-    image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=300&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=400&h=400&fit=crop&q=80',
   },
   shirts: {
     label: 'Shirts',
-    image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=300&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&h=400&fit=crop&q=80',
   },
   denims: {
     label: 'Denims',
-    image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=300&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=400&h=400&fit=crop&q=80',
   },
   'formal-pants': {
     label: 'Trousers',
-    image: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=300&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&h=400&fit=crop&q=80',
   },
   sweatshirts: {
     label: 'Sweats',
-    image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=300&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=400&h=400&fit=crop&q=80',
   },
   hoodies: {
     label: 'Hoodies',
-    image: 'https://images.unsplash.com/photo-1556821840-47b2c0d5c829?w=300&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1556821840-47b2c0d5c829?w=400&h=400&fit=crop&q=80',
   },
   jackets: {
     label: 'Jackets',
-    image: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=300&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=400&h=400&fit=crop&q=80',
   },
 };
 
@@ -51,7 +51,7 @@ const CATEGORY_VISUALS: Record<string, { label: string; image: string }> = {
 export default function ShopPage() {
   return (
     <Suspense fallback={
-      <div className="py-12 px-6 md:px-12 max-w-screen-2xl mx-auto w-full">
+      <div className="py-16 md:py-24 px-8 md:px-12 max-w-screen-2xl mx-auto w-full">
         <div className="h-10 shimmer w-1/4 mb-10" />
         <ProductGridSkeleton count={8} />
       </div>
@@ -103,48 +103,31 @@ function ShopProductCard({
 
         {/* Sale Badge */}
         {prod.compare_price && prod.compare_price > prod.price && (
-          <span className="absolute top-3 left-3 bg-brand-red text-brand-offwhite text-[9px] font-bold py-1 px-2.5 tracking-wider uppercase z-10">
+          <span className="absolute top-3 left-3 border border-brand-offwhite/30 text-brand-offwhite text-[9px] tracking-[0.2em] font-semibold py-1 px-2.5 uppercase bg-brand-black/60 backdrop-blur-sm z-10">
             Sale
           </span>
         )}
 
-        {/* Quick Add — slides up on hover desktop, always-visible mobile */}
-        <div className="absolute inset-x-0 bottom-0 p-3 z-10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-streetwear md:translate-y-full">
+        {/* Corner-Anchored Quick Add */}
+        <div className="absolute bottom-3 right-3 z-10">
           <button
             onClick={handleQuickAddClick}
             disabled={isAdding}
-            className="w-full relative overflow-hidden bg-brand-offwhite text-brand-black text-[10px] tracking-[0.2em] font-bold py-3 uppercase"
+            className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg group/btn relative ${
+              isAdding 
+                ? 'bg-brand-red border-brand-red text-white' 
+                : 'bg-brand-black/90 border-zinc-800 hover:border-brand-offwhite text-brand-offwhite hover:bg-brand-offwhite hover:text-brand-black'
+            } opacity-100 scale-100 md:opacity-0 md:scale-95 group-hover:md:opacity-100 group-hover:md:scale-100`}
             aria-label={`Quick add ${prod.name} to cart`}
           >
-            <span
-              className={`absolute inset-0 bg-brand-red transition-transform duration-300 origin-left ${
-                isAdding ? 'scale-x-100' : 'scale-x-0'
-              }`}
-              aria-hidden="true"
-            />
-            <span className="relative z-10 flex items-center justify-center gap-1.5">
-              {isAdding
-                ? <span className="animate-scale-in text-brand-offwhite">✓ Added</span>
-                : '+ Quick Add'}
+            <span className="absolute bottom-12 right-0 bg-brand-black border border-zinc-800 text-brand-offwhite text-[9px] tracking-widest uppercase py-1 px-2 opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">
+              {isAdding ? 'Added' : 'Quick Add'}
             </span>
-          </button>
-        </div>
-
-        {/* Mobile: always-visible Add button */}
-        <div className="md:hidden absolute inset-x-0 bottom-0 p-2 z-10">
-          <button
-            onClick={handleQuickAddClick}
-            disabled={isAdding}
-            className="w-full relative overflow-hidden bg-brand-offwhite/90 text-brand-black text-[9px] tracking-[0.15em] font-bold py-2 uppercase"
-            aria-label={`Quick add ${prod.name} to cart`}
-          >
-            <span
-              className={`absolute inset-0 bg-brand-red transition-transform duration-300 origin-left ${
-                isAdding ? 'scale-x-100' : 'scale-x-0'
-              }`}
-              aria-hidden="true"
-            />
-            <span className="relative z-10">{isAdding ? '✓' : '+'}</span>
+            {isAdding ? (
+              <span className="text-xs font-bold font-mono">✓</span>
+            ) : (
+              <Plus className="w-4 h-4" />
+            )}
           </button>
         </div>
       </div>
@@ -182,6 +165,7 @@ function ShopContent() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(12);
 
@@ -224,20 +208,24 @@ function ShopContent() {
     setSelectedSubcategory(subcat || 'all');
   }, [searchParams]);
 
-  // Fetch products — unchanged
+  // Fetch products & categories — dynamic database load
   useEffect(() => {
-    async function fetchProducts() {
+    async function loadData() {
       try {
         setLoading(true);
-        const data = await dbService.getProducts();
-        setProducts(data);
+        const [prods, cats] = await Promise.all([
+          dbService.getProducts(),
+          dbService.getAllCategories()
+        ]);
+        setProducts(prods);
+        setCategoriesList(cats);
       } catch (err) {
-        console.error('Failed to load products:', err);
+        console.error('Failed to load shop page data:', err);
       } finally {
         setLoading(false);
       }
     }
-    fetchProducts();
+    loadData();
   }, []);
 
   // Category handlers — unchanged
@@ -328,22 +316,23 @@ function ShopContent() {
 
   const MAIN_CATEGORIES = [
     { slug: 'all', label: 'All' },
-    { slug: 't-shirts', label: 'T-Shirts' },
-    { slug: 'shirts', label: 'Shirts' },
-    { slug: 'denims', label: 'Denims' },
-    { slug: 'formal-pants', label: 'Formal Pants' },
-    { slug: 'sweatshirts', label: 'Sweatshirts' },
-    { slug: 'hoodies', label: 'Hoodies' },
-    { slug: 'jackets', label: 'Jackets' },
+    ...categoriesList
+      .filter((c) => !c.parent_id && c.is_active)
+      .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+      .map((c) => ({ slug: c.slug, label: c.name }))
   ];
 
-  const SUBCATEGORIES: Record<string, Array<{ slug: string; label: string }>> = {
-    't-shirts': [{ slug: 'boxy-fit-t-shirts', label: 'Boxy Fit' }, { slug: 'waffle-t-shirts', label: 'Waffle' }],
-    'shirts': [{ slug: 'imp-shirts', label: 'Imported' }, { slug: 'regular-shirts', label: 'Regular' }],
-    'denims': [{ slug: 'regular-denims', label: 'Regular' }, { slug: 'pattern-denims', label: 'Pattern' }],
-    'sweatshirts': [{ slug: 'regular-sweatshirts', label: 'Regular' }, { slug: 'polo-sweatshirts', label: 'Polo' }],
-    'jackets': [{ slug: 'biker-jackets', label: 'Biker' }, { slug: 'varsity-jackets', label: 'Varsity' }, { slug: 'checked-jackets', label: 'Checked' }],
-  };
+  const SUBCATEGORIES = categoriesList.reduce((acc, cat) => {
+    if (cat.parent_id) {
+      const parent = categoriesList.find((p) => p.id === cat.parent_id);
+      if (parent) {
+        const parentSlug = parent.slug;
+        if (!acc[parentSlug]) acc[parentSlug] = [];
+        acc[parentSlug].push({ slug: cat.slug, label: cat.name });
+      }
+    }
+    return acc;
+  }, {} as Record<string, Array<{ slug: string; label: string }>>);
 
   const genders = ['all', 'unisex', 'men', 'women'];
   const sizes = ['all', 'XS', 'S', 'M', 'L', 'XL', 'XXL'];
@@ -364,7 +353,7 @@ function ShopContent() {
     <div className="w-full flex flex-col">
       {/* ── Page Header ── */}
       <div className="border-b border-brand-graphite bg-brand-black">
-        <div className="max-w-screen-2xl mx-auto px-6 md:px-12 pt-12 pb-8">
+        <div className="max-w-screen-2xl mx-auto px-8 md:px-12 pt-16 pb-12">
           <span className="eyebrow mb-3 block">The Archive</span>
           <div className="flex items-end justify-between gap-4">
             <h1 className="text-brand-offwhite leading-none font-display uppercase" style={{ fontSize: 'clamp(2.4rem, 6vw, 5rem)' }}>
@@ -379,7 +368,7 @@ function ShopContent() {
 
       {/* ── Sticky Category Pill Bar ── */}
       <div className={`sticky transition-all duration-500 ease-in-out z-40 bg-brand-black/95 backdrop-blur-md border-b border-brand-graphite ${hideHeader ? 'top-0' : 'top-16'}`}>
-        <div className={`max-w-screen-2xl mx-auto px-6 md:px-12 transition-all duration-300 ease-in-out ${isSticky ? 'py-1.5' : 'py-3'}`}>
+        <div className={`max-w-screen-2xl mx-auto px-8 md:px-12 transition-all duration-300 ease-in-out ${isSticky ? 'py-1.5' : 'py-3'}`}>
           
           {/* Main Controls Row */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -389,58 +378,58 @@ function ShopContent() {
               <div className="flex gap-3.5 pb-px px-1 justify-start md:justify-center" role="tablist" aria-label="Filter by category">
                 {MAIN_CATEGORIES.map((cat) => {
                   const isActive = selectedCategory === cat.slug;
-                  const visual = CATEGORY_VISUALS[cat.slug] || CATEGORY_VISUALS['all'];
+                  const dbCat = categoriesList.find((c) => c.slug === cat.slug);
+                  const visual = dbCat?.image_url
+                    ? { label: dbCat.name, image: dbCat.image_url }
+                    : CATEGORY_VISUALS[cat.slug] || CATEGORY_VISUALS['all'];
                   return (
-                    <button
-                      key={cat.slug}
-                      onClick={() => handleCategoryChange(cat.slug)}
-                      role="tab"
-                      aria-selected={isActive}
-                      className={`group shrink-0 relative overflow-hidden flex flex-col justify-end items-center border transition-all duration-300 ease-in-out ${
-                        isSticky
-                          ? 'w-11 h-[58px] md:w-16 md:h-[80px] pb-1.5 md:pb-2.5 rounded-full'
-                          : 'w-[72px] h-[96px] md:w-[90px] md:h-[120px] pb-3.5 md:pb-5 rounded-full'
-                      } ${
-                        isActive
-                          ? 'border-brand-amber bg-brand-amber/10 scale-105 shadow-[0_0_12px_rgba(201,123,58,0.25)]'
-                          : 'border-brand-graphite bg-brand-charcoal/40 hover:border-brand-stone'
-                      }`}
-                    >
-                      {/* Background Visual Image (Grayscale filter removed, colorized) */}
-                      <div className="absolute inset-0 z-[1] transition-transform duration-500 group-hover:scale-110">
-                        <Image
-                          src={visual.image}
-                          alt=""
-                          fill
-                          sizes="(max-width: 768px) 72px, 90px"
-                          className="object-cover filter brightness-[0.5] transition-all duration-300 group-hover:brightness-[0.65]"
-                        />
-                        <div className="absolute inset-0 bg-brand-black/10" />
-                      </div>
+                    <div key={cat.slug} className="flex flex-col items-center shrink-0">
+                      <button
+                        onClick={() => handleCategoryChange(cat.slug)}
+                        role="tab"
+                        aria-selected={isActive}
+                        className={`group relative overflow-hidden aspect-square border transition-all duration-300 ease-in-out rounded-full ${
+                          isSticky
+                            ? 'w-12 h-12 md:w-14 md:h-14'
+                            : 'w-[72px] h-[72px] md:w-[86px] md:h-[86px]'
+                        } ${
+                          isActive
+                            ? 'border-brand-amberLight bg-brand-amberLight/10 scale-105 shadow-[0_0_12px_rgba(232,228,220,0.15)]'
+                            : 'border-brand-graphite bg-brand-charcoal/40 hover:border-brand-stone'
+                        }`}
+                      >
+                        {/* Background Visual Image (Grayscale filter removed, colorized) */}
+                        <div className="absolute inset-0 z-[1] transition-transform duration-500 group-hover:scale-110">
+                          <Image
+                            src={visual.image || 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400&h=400&fit=crop&q=80'}
+                            alt=""
+                            fill
+                            sizes="(max-width: 768px) 72px, 86px"
+                            className="object-cover filter brightness-[0.55] transition-all duration-300 group-hover:brightness-[0.7]"
+                          />
+                          <div className="absolute inset-0 bg-brand-black/10" aria-hidden="true" />
+                        </div>
 
-                      {/* Overlaid Label text — hides smoothly when sticky */}
-                      <span className={`relative z-[2] font-bold tracking-[0.16em] uppercase text-brand-offwhite text-center px-1 font-body leading-none transition-all duration-300 ease-in-out ${
-                        isSticky
-                          ? 'text-[0px] opacity-0 mb-0 h-0 overflow-hidden'
-                          : 'text-[8px] md:text-[9.5px] opacity-100 mb-0.5 md:mb-1'
-                      }`}>
-                        {visual.label}
-                      </span>
+                        {/* Active indicator dot */}
+                        {isActive && (
+                          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-brand-amberLight z-10 animate-fade-in" aria-hidden="true" />
+                        )}
 
-                      {/* Active indicator dot */}
-                      {isActive && (
-                        <span className={`relative z-[2] rounded-full bg-brand-amber transition-all duration-300 ${
-                          isSticky ? 'w-1 h-1 mt-0' : 'w-1.5 h-1.5 mt-1'
-                        }`} aria-hidden="true" />
+                        {/* Subcategory alert badge */}
+                        {isActive && selectedSubcategory !== 'all' && (
+                          <span className="absolute top-1.5 left-1.5 w-2 h-2 rounded-full bg-brand-amberLight z-10 animate-fade-in" aria-hidden="true" />
+                        )}
+                      </button>
+
+                      {/* Overlaid Label text — below the circle, hides smoothly when sticky */}
+                      {!isSticky && (
+                        <span className={`mt-2.5 font-bold tracking-[0.16em] uppercase text-center px-1 font-body leading-none text-[8.5px] md:text-[9.5px] transition-colors ${
+                          isActive ? 'text-brand-offwhite' : 'text-brand-stone'
+                        }`}>
+                          {visual.label}
+                        </span>
                       )}
-
-                      {/* Subcategory alert badge */}
-                      {isActive && selectedSubcategory !== 'all' && (
-                        <span className={`absolute rounded-full bg-brand-amber z-[3] transition-all duration-300 ${
-                          isSticky ? 'top-1 right-1 w-1 h-1' : 'top-2 right-2 w-1.5 h-1.5'
-                        }`} aria-hidden="true" />
-                      )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -522,7 +511,7 @@ function ShopContent() {
       </div>
 
       {/* ── Product Grid ── */}
-      <div className="max-w-screen-2xl mx-auto px-6 md:px-12 py-10 md:py-14 w-full flex-1">
+      <div className="max-w-screen-2xl mx-auto px-8 md:px-12 py-16 md:py-24 w-full flex-1">
         {loading ? (
           <ProductGridSkeleton count={8} />
         ) : filteredProducts.length === 0 ? (
@@ -557,7 +546,7 @@ function ShopContent() {
           <>
             {/* Product grid: 2-col mobile, 3-col tablet, 4-col desktop */}
             <div
-              className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4 lg:gap-5"
+              className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6 lg:gap-8"
               role="list"
               aria-label={`${filteredProducts.length} products`}
             >

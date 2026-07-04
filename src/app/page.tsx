@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { ArrowRight, ArrowUpRight, ChevronRight } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, ChevronRight, Plus } from 'lucide-react';
 import { dbService } from '@/lib/db';
 import { Product, Category } from '@/types';
 import { useCartStore } from '@/lib/cartStore';
@@ -102,38 +102,39 @@ function ProductCard({
 
         {/* Sale Badge */}
         {prod.compare_price && prod.compare_price > prod.price && (
-          <span className="absolute top-3 left-3 bg-brand-red text-brand-offwhite text-[9px] font-bold py-1 px-2 tracking-widest uppercase z-10">
+          <span className="absolute top-3 left-3 border border-brand-offwhite/30 text-brand-offwhite text-[9px] tracking-[0.2em] font-semibold py-1 px-2.5 uppercase bg-brand-black/60 backdrop-blur-sm z-10">
             Sale
           </span>
         )}
 
         {/* NEW DROP badge */}
         {!prod.compare_price && prod.is_featured && (
-          <span className="absolute top-3 left-3 border border-brand-amber/50 text-brand-amber text-[9px] font-bold py-1 px-2 tracking-widest uppercase z-10 bg-brand-black/60 backdrop-blur-sm">
+          <span className="absolute top-3 left-3 border border-brand-offwhite/20 text-brand-offwhite text-[9px] tracking-[0.2em] font-semibold py-1 px-2.5 uppercase bg-brand-black/60 backdrop-blur-sm z-10">
             New Drop
           </span>
         )}
 
-        {/* Quick Add */}
-        <div className="absolute inset-x-0 bottom-0 p-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-streetwear z-10">
+        {/* Corner-Anchored Quick Add */}
+        <div className="absolute bottom-3 right-3 z-10">
           <button
             onClick={handleQuickAddClick}
             disabled={isAdding}
-            className="w-full relative overflow-hidden bg-brand-offwhite text-brand-black text-[10px] tracking-[0.2em] font-bold py-3 uppercase"
+            className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg group/btn relative ${
+              isAdding 
+                ? 'bg-brand-red border-brand-red text-white' 
+                : 'bg-brand-black/90 border-zinc-800 hover:border-brand-offwhite text-brand-offwhite hover:bg-brand-offwhite hover:text-brand-black'
+            } opacity-100 scale-100 md:opacity-0 md:scale-95 group-hover:md:opacity-100 group-hover:md:scale-100`}
             id={`quick-add-${prod.id}`}
             aria-label={`Quick add ${prod.name} to cart`}
           >
-            <span
-              className={`absolute inset-0 bg-brand-red transition-transform duration-300 origin-left ${
-                isAdding ? 'scale-x-100' : 'scale-x-0'
-              }`}
-              aria-hidden="true"
-            />
-            <span className="relative z-10 flex items-center justify-center gap-1.5">
-              {isAdding
-                ? <span className="animate-scale-in text-brand-offwhite">✓ Added</span>
-                : '+ Quick Add'}
+            <span className="absolute bottom-12 right-0 bg-brand-black border border-zinc-800 text-brand-offwhite text-[9px] tracking-widest uppercase py-1 px-2 opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">
+              {isAdding ? 'Added' : 'Quick Add'}
             </span>
+            {isAdding ? (
+              <span className="text-xs font-bold font-mono">✓</span>
+            ) : (
+              <Plus className="w-4 h-4" />
+            )}
           </button>
         </div>
       </div>
@@ -271,6 +272,21 @@ export default function Homepage() {
         imagesRight={heroImagesRight}
       />
 
+      {/* Mobile only below-the-fold content block */}
+      <div className="md:hidden bg-[#0A0A0A] px-8 py-10 text-center border-b border-brand-graphite space-y-4">
+        <div className="inline-flex items-center gap-2.5 justify-center">
+          <span className="block w-6 h-px bg-brand-amber" aria-hidden="true" />
+          <span className="text-brand-stone text-[9px] font-semibold tracking-[0.38em] uppercase font-body leading-none">
+            New Season Drop
+          </span>
+          <span className="block w-6 h-px bg-brand-amber" aria-hidden="true" />
+        </div>
+        <p className="text-brand-stone/85 text-[11px] tracking-widest leading-relaxed uppercase font-body max-w-sm mx-auto">
+          Heavyweight apparel designed to challenge gender constraints.
+          Drop shoulder silhouettes. Raw minimalist industrial DNA.
+        </p>
+      </div>
+
       {/* ═══════════════════════════════════════════
           2. ANNOUNCEMENT TICKER — ROTATING SINGLE MESSAGE (Option A)
           ═══════════════════════════════════════════ */}
@@ -281,7 +297,7 @@ export default function Homepage() {
           ═══════════════════════════════════════════ */}
       <section
         ref={categoryRef}
-        className="py-24 md:py-36 px-6 md:px-12 max-w-screen-2xl mx-auto w-full"
+        className="py-32 md:py-48 px-8 md:px-12 max-w-screen-2xl mx-auto w-full"
         aria-labelledby="categories-heading"
       >
         {/* Header */}
@@ -333,7 +349,7 @@ export default function Homepage() {
                   aria-label={`Shop ${cat.name} collection`}
                 >
                   <Image
-                    src={cat.image_url}
+                    src={cat.image_url || 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=800'}
                     alt={`${cat.name} clothing — DRFTN collection`}
                     fill
                     sizes={i === 0 ? '(max-width: 768px) 100vw, 50vw' : '(max-width: 768px) 50vw, 25vw'}
@@ -384,7 +400,7 @@ export default function Homepage() {
           ═══════════════════════════════════════════ */}
       <section
         ref={featuredRef}
-        className="py-24 md:py-36 px-6 md:px-12 border-t border-brand-graphite bg-brand-black w-full"
+        className="py-32 md:py-48 px-8 md:px-12 border-t border-brand-graphite bg-brand-black w-full"
         aria-labelledby="featured-heading"
       >
         <div className="max-w-screen-2xl mx-auto">
@@ -449,7 +465,7 @@ export default function Homepage() {
           ═══════════════════════════════════════════ */}
       <section
         ref={storyRef}
-        className="py-28 md:py-44 px-6 md:px-12 max-w-screen-2xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-28 items-center"
+        className="py-36 md:py-56 px-8 md:px-12 max-w-screen-2xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-28 items-center"
         aria-labelledby="story-heading"
       >
         {/* Text */}
@@ -563,7 +579,7 @@ export default function Homepage() {
           ═══════════════════════════════════════════ */}
       <section
         ref={igRef}
-        className="py-24 md:py-36 px-6 md:px-12 w-full"
+        className="py-32 md:py-48 px-8 md:px-12 w-full"
         aria-labelledby="lookbook-heading"
       >
         <div className="max-w-screen-2xl mx-auto">
@@ -629,7 +645,7 @@ export default function Homepage() {
           8. NEWSLETTER — Full-bleed editorial
           ═══════════════════════════════════════════ */}
       <section
-        className="relative border-t border-brand-graphite bg-brand-charcoal py-24 md:py-32 px-6 md:px-12 overflow-hidden"
+        className="relative border-t border-brand-graphite bg-brand-charcoal py-32 md:py-44 px-8 md:px-12 overflow-hidden"
         aria-labelledby="newsletter-heading"
       >
         {/* Giant display type behind form — purely decorative */}
