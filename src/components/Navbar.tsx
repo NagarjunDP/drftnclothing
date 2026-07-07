@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
-import { ShoppingBag, X, Menu } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { ShoppingBag, X, Menu, Search } from 'lucide-react';
 import { useCartStore } from '../lib/cartStore';
 import { useAnimationStore } from '../lib/animationStore';
 import { SignInButton, UserButton, useUser } from '@clerk/nextjs';
 import AnnouncementTicker from './AnnouncementTicker';
+import { gsap } from 'gsap';
 
 const NAV_LINKS = [
   { href: '/shop', label: 'Collection' },
@@ -19,105 +20,67 @@ const NAV_LINKS = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { isSignedIn, isLoaded } = useUser();
   const setIsOpen = useCartStore((state) => state.setIsOpen);
   const cartCount = useCartStore((state) => state.items.reduce((acc, item) => acc + item.quantity, 0));
   const cartPulseActive = useAnimationStore((state) => state.cartPulseActive);
 
-  const [scrolled, setScrolled] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [hideNav, setHideNav] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [mounted, setMounted] = useState(false);
-  const lastScrollY = useRef(0);
+  const progressBarRef = useRef<HTMLDivElement>(null);
 
-  // Focus management for mobile menu
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const firstNavLinkRef = useRef<HTMLAnchorElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const isHomepage = pathname === '/';
+  const isAdminPage = pathname?.startsWith('/admin');
+  const isCheckoutPage = pathname === '/checkout';
 
   useEffect(() => {
     setMounted(true);
     const handleScroll = () => {
-      const y = window.scrollY;
-      setScrolled(y > 20);
-      if (y > lastScrollY.current && y > 80) {
-        setHideNav(true);
-      } else {
-        setHideNav(false);
+      const scrolledY = window.scrollY;
+      setIsScrolled(scrolledY > 50);
+
+      // Compute scroll percentage
+      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (docHeight > 0 && progressBarRef.current) {
+        const pct = (scrolledY / docHeight) * 100;
+        gsap.to(progressBarRef.current, {
+          width: `${pct}%`,
+          duration: 0.15,
+          ease: 'power1.out',
+          overwrite: 'auto'
+        });
       }
-      lastScrollY.current = y;
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // set initial state
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Scroll-lock + focus-trap when mobile menu is open
+  // Lock scroll when mobile menu is open
   useEffect(() => {
     if (mobileMenuOpen) {
-      // Lock body scroll (iOS Safari compatible)
-      const scrollY = window.scrollY;
       document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      // Focus the close button when menu opens
-      setTimeout(() => closeButtonRef.current?.focus(), 100);
     } else {
-      // Restore scroll position
-      const scrollY = document.body.style.top;
       document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0', 10) * -1);
-      }
     }
     return () => {
       document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
     };
   }, [mobileMenuOpen]);
 
-  // ESC key to close menu
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && mobileMenuOpen) {
-        setMobileMenuOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mobileMenuOpen]);
-
-  // Focus trap inside mobile menu
-  const handleMenuKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (!mobileMenuOpen) return;
-    if (e.key !== 'Tab') return;
-    const focusable = menuRef.current?.querySelectorAll<HTMLElement>(
-      'a, button, input, [tabindex]:not([tabindex="-1"])'
-    );
-    if (!focusable || focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (e.shiftKey) {
-      if (document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      }
-    } else {
-      if (document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchOpen(false);
+      setSearchQuery('');
     }
-  }, [mobileMenuOpen]);
+  };
 
-  const isAdminPage = pathname?.startsWith('/admin');
-  const isCheckoutPage = pathname === '/checkout';
-  const isShopPage = pathname?.startsWith('/shop');
   if (isAdminPage) return null;
 
   return (
@@ -125,45 +88,55 @@ export default function Navbar() {
       {/* ── Announcement Bar ── */}
       <AnnouncementTicker />
 
-      {/* ── Main Navigation ── */}
+      {/* ── Main Navigation Top Rail ── */}
       <header
-        className={`w-full sticky top-0 z-50 transition-all duration-500 ${scrolled ? 'glass-nav shadow-2xl shadow-black/50' : 'bg-transparent border-b border-transparent'
-          } ${hideNav ? '-translate-y-full' : 'translate-y-0'}`}
+        className={`w-full sticky top-0 z-[2000] transition-all duration-300 ${
+          isScrolled || !isHomepage
+            ? 'bg-[#0A0A0A] border-b border-brand-graphite/40 shadow-[0_4px_30px_rgba(0,0,0,0.5)]'
+            : 'bg-transparent border-b border-transparent'
+        }`}
         role="banner"
       >
+        {/* Subtle top scrim for nav and logo contrast */}
+        <div 
+          className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/85 to-transparent pointer-events-none z-[-1]"
+          aria-hidden="true"
+        />
+
         <nav
-          className="max-w-screen-2xl mx-auto px-6 md:px-12 h-16 flex items-center justify-between"
+          className="max-w-screen-2xl mx-auto px-6 md:px-12 h-16 flex items-center justify-between relative"
           aria-label="Main navigation"
         >
-          {/* ── Logo — Increased by ~45% on mobile with entrance animation ── */}
+          {/* Logo (Left-aligned) */}
           <Link
             href="/"
             className="flex items-center select-none group flex-shrink-0"
             aria-label="DRFTN Clothing — Home"
           >
-            <div className="relative w-44 h-16 md:w-56 md:h-18 animate-[scaleIn_500ms_ease-out_forwards] origin-left">
+            <div className="relative w-40 h-14 md:w-52 md:h-18">
               <Image
                 src="/logo.png?v=3"
                 alt="DRFTN Clothing"
                 fill
                 priority
-                sizes="(max-width: 768px) 176px, 224px"
-                className="object-contain object-left transition-opacity duration-300 group-hover:opacity-80"
+                sizes="(max-width: 768px) 160px, 208px"
+                className="object-contain object-left transition-opacity duration-300 group-hover:opacity-80 scale-[1.25] origin-left"
               />
             </div>
           </Link>
 
-          {/* ── Desktop Nav Links ── */}
-          <div className="hidden lg:flex items-center gap-8" role="list">
+          {/* Desktop Navigation Links (Right-aligned / Spaced) */}
+          <div className="hidden lg:flex items-center gap-8 ml-auto mr-12" role="list">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 role="listitem"
-                className={`text-[11px] font-medium tracking-[0.18em] uppercase transition-colors duration-200 border-animate pb-0.5 ${pathname === link.href || pathname?.startsWith(link.href + '?')
-                  ? 'text-brand-offwhite'
-                  : 'text-brand-silver hover:text-brand-offwhite'
-                  }`}
+                className={`text-[10px] font-bold tracking-[0.2em] uppercase transition-colors duration-200 hover:text-white ${
+                  pathname === link.href || pathname?.startsWith(link.href + '?')
+                    ? 'text-brand-red'
+                    : 'text-brand-silver'
+                }`}
                 aria-current={pathname === link.href ? 'page' : undefined}
               >
                 {link.label}
@@ -171,15 +144,43 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* ── Right Actions ── */}
-          <div className="flex items-center gap-4 md:gap-5">
-            {/* Auth — Hidden on mobile, managed by bottom nav "Me" tab */}
-            <div className="hidden lg:flex items-center">
+          {/* Action Icons (Search, Cart, User, Hamburger Menu) */}
+          <div className="flex items-center gap-3 md:gap-4">
+            
+            {/* Search Trigger */}
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="text-brand-silver hover:text-white p-2.5 transition-colors"
+              aria-label="Open search overlay"
+            >
+              <Search className="w-4.5 h-4.5 stroke-[1.8]" />
+            </button>
+
+            {/* Cart Trigger */}
+            <button
+              onClick={() => setIsOpen(true)}
+              className={`relative flex items-center p-2.5 transition-all duration-200 ${
+                cartPulseActive ? 'scale-125 text-brand-red' : 'text-brand-silver hover:text-white'
+              }`}
+              aria-label={`Open cart${mounted && cartCount > 0 ? `, ${cartCount} items` : ''}`}
+            >
+              <ShoppingBag className="w-4.5 h-4.5 stroke-[1.8]" />
+              {mounted && cartCount > 0 && (
+                <span
+                  className="absolute top-1.5 right-1.5 bg-brand-red text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center animate-scale-in"
+                  aria-hidden="true"
+                >
+                  {cartCount}
+                </span>
+              )}
+            </button>
+
+            {/* Desktop Auth */}
+            <div className="hidden lg:flex items-center pl-2">
               {isLoaded && !isSignedIn && (
                 <SignInButton mode="modal">
                   <button
-                    id="navbar-login-btn"
-                    className="text-[10px] font-semibold tracking-[0.2em] uppercase text-brand-silver hover:text-brand-offwhite transition-colors duration-200"
+                    className="text-[9px] font-bold tracking-[0.2em] uppercase text-brand-silver hover:text-white transition-colors duration-200"
                     aria-label="Sign in to your account"
                   >
                     Sign In
@@ -190,171 +191,121 @@ export default function Navbar() {
                 <UserButton
                   appearance={{
                     elements: {
-                      userButtonAvatarBox:
-                        'w-7 h-7 border border-brand-muted hover:border-brand-amber transition-colors rounded-full',
+                      userButtonAvatarBox: 'w-6 h-6 border border-brand-muted hover:border-brand-red transition-colors rounded-full',
                     },
                   }}
                 />
               )}
             </div>
 
-            {/* Divider */}
-            <div className="hidden lg:block w-px h-4 bg-brand-muted/60" aria-hidden="true" />
-
-            {/* Cart */}
+            {/* Mobile/Tablet Menu Hamburger Toggle */}
             <button
-              id="navbar-cart-btn"
-              onClick={() => setIsOpen(true)}
-              className={`relative flex items-center transition-all duration-200 group p-3 -mr-3 ${cartPulseActive ? 'scale-125 text-brand-red' : 'text-brand-silver hover:text-brand-offwhite'
-                }`}
-              aria-label={`Open cart${mounted && cartCount > 0 ? `, ${cartCount} items` : ''}`}
-            >
-              <ShoppingBag className="w-5 h-5 stroke-[1.5]" />
-              {mounted && cartCount > 0 && (
-                <span
-                  className="absolute -top-2 -right-2 bg-brand-red text-brand-offwhite text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-scale-in"
-                  aria-hidden="true"
-                >
-                  {cartCount}
-                </span>
-              )}
-            </button>
-
-            {/* Mobile Menu Toggle */}
-            <button
-              id="navbar-mobile-menu-btn"
               onClick={() => setMobileMenuOpen(true)}
-              className="hidden text-brand-silver hover:text-brand-offwhite transition-colors p-1"
+              className="lg:hidden text-brand-silver hover:text-white p-2.5 transition-colors"
               aria-label="Open navigation menu"
               aria-expanded={mobileMenuOpen}
-              aria-controls="mobile-menu"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-5 h-5 stroke-[1.8]" />
             </button>
+
           </div>
+
+          {/* Scroll Progress Bar / Speedometer Underline indicator */}
+          <div
+            ref={progressBarRef}
+            className="absolute bottom-0 left-0 h-[2px] bg-brand-red"
+            style={{ width: '0%' }}
+            aria-hidden="true"
+          />
         </nav>
-
-        {/* ── Category Strip — integrated second row of navigation (hidden on checkout/shop) ── */}
-        {!isCheckoutPage && !isShopPage && (
-          <div className="relative w-full border-t border-brand-graphite/40 bg-brand-black/90 backdrop-blur-md hidden md:block">
-            {/* Left and Right Visual Fading Gradients for Scrolling indication */}
-            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-brand-black to-transparent pointer-events-none z-10" />
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-brand-black to-transparent pointer-events-none z-10" />
-
-            {/* Horizontal pills wrapper */}
-            <div className="max-w-screen-2xl mx-auto px-6 md:px-12 py-3 flex gap-2.5 overflow-x-auto scrollbar-none items-center">
-              {[
-                { label: 'Hoodies', href: '/shop?category=hoodies' },
-                { label: 'Jackets', href: '/shop?category=jackets' },
-                { label: 'T-Shirts', href: '/shop?category=t-shirts' },
-                { label: 'Denims', href: '/shop?category=denims' },
-                { label: 'Accessories', href: '/shop?category=accessories' },
-                { label: 'New Drops', href: '/shop' }
-              ].map((cat) => (
-                <Link
-                  key={cat.label}
-                  href={cat.href}
-                  className="px-3.5 py-1.5 rounded-full border border-brand-graphite bg-brand-charcoal/30 hover:border-brand-stone hover:bg-brand-muted/20 text-[9px] md:text-[10px] font-bold tracking-[0.15em] text-brand-stone hover:text-brand-offwhite uppercase transition-all duration-200 shrink-0 font-body"
-                >
-                  {cat.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
       </header>
 
-      {/* ── Full-Screen Mobile Menu ── */}
-      <div
-        id="mobile-menu"
-        ref={menuRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Navigation menu"
-        onKeyDown={handleMenuKeyDown}
-        className={`mobile-menu-fullscreen lg:hidden ${mobileMenuOpen ? 'open' : ''}`}
-        style={{ zIndex: 300 }}
-      >
-        {/* Top bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-brand-graphite flex-shrink-0">
-          <Link
-            href="/"
-            onClick={() => setMobileMenuOpen(false)}
-            className="relative w-20 h-10 block"
-            aria-label="DRFTN Home"
-          >
-            <Image
-              src="/logo.png?v=3"
-              alt="DRFTN Clothing"
-              fill
-              sizes="80px"
-              className="object-contain object-left"
-            />
-          </Link>
+      {/* ── Search Overlay Modal ── */}
+      {searchOpen && (
+        <div className="fixed inset-0 z-[3000] bg-[#0A0A0A] backdrop-blur-xl flex flex-col justify-start px-6 pt-24 animate-[fadeIn_0.3s_ease-out_forwards]">
+          {/* Close Button */}
           <button
-            ref={closeButtonRef}
-            onClick={() => setMobileMenuOpen(false)}
-            className="text-brand-silver hover:text-brand-offwhite transition-colors p-2 -mr-2"
-            aria-label="Close navigation menu"
+            onClick={() => setSearchOpen(false)}
+            className="absolute top-6 right-6 p-2 text-brand-stone hover:text-white transition-colors"
+            aria-label="Close search overlay"
           >
             <X className="w-6 h-6" />
           </button>
-        </div>
 
-        {/* Nav Links — large Antonio display type */}
-        <nav className="flex-1 flex flex-col justify-center px-8 py-8 space-y-1" aria-label="Mobile navigation">
-          {NAV_LINKS.map((link, i) => (
-            <Link
-              key={link.href}
-              ref={i === 0 ? firstNavLinkRef : undefined}
-              href={link.href}
-              onClick={() => setMobileMenuOpen(false)}
-              className={`block font-display text-5xl uppercase font-bold leading-[1.1] py-3 border-b border-brand-graphite transition-colors duration-200 ${pathname === link.href
-                ? 'text-brand-offwhite'
-                : 'text-brand-muted hover:text-brand-offwhite'
-                }`}
-              aria-current={pathname === link.href ? 'page' : undefined}
-              style={{ animationDelay: `${i * 0.06}s` }}
-            >
-              <span className="text-brand-amber text-xl mr-2 font-body font-normal tracking-widest">
-                {String(i + 1).padStart(2, '0')}
-              </span>
-              {link.label}
+          {/* Search Form */}
+          <form onSubmit={handleSearchSubmit} className="w-full max-w-lg mx-auto">
+            <label className="text-[10px] uppercase tracking-[0.2em] text-brand-stone font-bold block mb-2 font-body">
+              Search Collection
+            </label>
+            <div className="relative border-b border-brand-graphite py-2 flex items-center">
+              <input
+                type="text"
+                autoFocus
+                placeholder="TYPE TO SEARCH..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-transparent text-lg font-display text-white uppercase tracking-widest focus:outline-none placeholder-brand-graphite"
+              />
+              <button type="submit" className="text-brand-stone hover:text-white p-1">
+                <Search className="w-5 h-5" />
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ── Mobile Full-Screen Menu Drawer ── */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-[3000] bg-[#0A0A0A] flex flex-col justify-between px-8 py-8 animate-[fadeIn_0.25s_ease-out_forwards]">
+          {/* Top Bar inside Drawer */}
+          <div className="flex items-center justify-between">
+            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="relative w-28 h-10 block">
+              <Image src="/logo.png?v=3" alt="DRFTN Logo" fill className="object-contain object-left" />
             </Link>
-          ))}
-        </nav>
-
-        {/* Bottom strip */}
-        <div className="px-8 py-6 border-t border-brand-graphite flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-4">
-            {isLoaded && !isSignedIn && (
-              <SignInButton mode="modal">
-                <button
-                  className="text-[11px] font-semibold tracking-[0.2em] uppercase text-brand-silver hover:text-brand-offwhite transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Sign In / Register
-                </button>
-              </SignInButton>
-            )}
-            {isLoaded && isSignedIn && (
-              <div className="flex items-center gap-2">
-                <UserButton
-                  appearance={{
-                    elements: {
-                      userButtonAvatarBox: 'w-6 h-6 border border-brand-muted rounded-full',
-                    },
-                  }}
-                />
-                <span className="text-[10px] tracking-[0.2em] uppercase text-brand-silver font-body">Account</span>
-              </div>
-            )}
+            <button onClick={() => setMobileMenuOpen(false)} className="text-white p-2" aria-label="Close navigation menu">
+              <X className="w-6 h-6" />
+            </button>
           </div>
-          <p className="text-[10px] tracking-[0.2em] uppercase text-brand-graphite font-body">
-            Born in Yelahanka
-          </p>
+
+          {/* Drawer Nav Links */}
+          <nav className="flex flex-col space-y-6 pt-16 flex-grow" aria-label="Mobile navigation links">
+            {NAV_LINKS.map((link, idx) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-4xl font-display font-black uppercase tracking-wider text-brand-silver hover:text-white transition-colors"
+              >
+                <span className="text-brand-red text-lg font-mono mr-3">{String(idx + 1).padStart(2, '0')}</span>
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Bottom section of Drawer */}
+          <div className="border-t border-brand-graphite/40 pt-6 flex items-center justify-between">
+            <div>
+              {isLoaded && !isSignedIn && (
+                <SignInButton mode="modal">
+                  <button
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="text-xs font-bold uppercase tracking-widest text-brand-silver hover:text-white"
+                  >
+                    Sign In / Register
+                  </button>
+                </SignInButton>
+              )}
+              {isLoaded && isSignedIn && (
+                <div className="flex items-center gap-2">
+                  <UserButton afterSignOutUrl="/" />
+                  <span className="text-xs uppercase tracking-wider text-brand-stone">Account</span>
+                </div>
+              )}
+            </div>
+            <p className="text-[10px] uppercase tracking-widest text-brand-stone">BENGALURU STREETWEAR</p>
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }

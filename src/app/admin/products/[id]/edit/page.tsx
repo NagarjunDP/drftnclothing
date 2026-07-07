@@ -1,11 +1,21 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import ProductForm from '@/components/ProductForm';
+import dynamic from 'next/dynamic';
 import { db } from '@/lib/db';
 import { Product } from '@/types';
 import { useParams, useRouter } from 'next/navigation';
 import { useToast } from '@/components/ToastContainer';
+
+const ProductForm = dynamic(() => import('@/components/ProductForm'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center min-h-[400px] text-zinc-500 text-xs uppercase tracking-widest font-mono">
+      Loading studio...
+    </div>
+  ),
+});
+
 
 export default function EditProductPage() {
   const params = useParams();

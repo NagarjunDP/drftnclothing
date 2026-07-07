@@ -164,7 +164,7 @@ export default function RootLayout({
             }}
           />
         </head>
-        <body className="antialiased min-h-screen flex flex-col bg-brand-black text-brand-offwhite pb-16 md:pb-0">
+        <body className="antialiased min-h-screen flex flex-col bg-brand-black text-brand-offwhite">
           {/* Global Navbar */}
           <Navbar />
 

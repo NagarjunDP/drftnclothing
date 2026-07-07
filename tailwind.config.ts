@@ -13,28 +13,28 @@ const config: Config = {
         foreground: "var(--foreground)",
         brand: {
           black: "#0A0A0A",
-          offwhite: "#F5F3EF",
+          offwhite: "#F5F5F3",
           cream: "#EAE7E0",
-          red: "#C8392A",
-          crimson: "#8B1A1A",
-          charcoal: "#141414",
-          graphite: "#1E1E1E",
+          red: "#F5F5F3",
+          crimson: "#FFFFFF",
+          charcoal: "#121212",
+          graphite: "#222222",
           muted: "#2C2C2C",
-          gray: "#6B6B6B",
-          silver: "#9A9A9A",
+          gray: "#8A8A8A",
+          silver: "#A0A0A0",
           gold: "#B8965A",
           goldLight: "#D4AF6E",
-          // Editorial accent — muted rust/amber (for decorative states, not destructive)
-          amber: "#8B7355",
-          amberLight: "#E8E4DC",
-          // Stone grey — secondary text and hairline dividers
-          stone: "#8C8A85",
-          stoneLight: "#D9D6CF",
+          // Editorial accent — Amber/Ember (grayscale)
+          amber: "#8A8A8A",
+          amberLight: "#A0A0A0",
+          // Stone grey — secondary text
+          stone: "#8A8A8A",
+          stoneLight: "#E5E5E5",
         },
       },
       fontFamily: {
-        display: ["'Antonio'", "sans-serif"],
-        body: ["'Inter'", "system-ui", "sans-serif"],
+        display: ["'Oxanium'", "sans-serif"],
+        body: ["'Outfit'", "system-ui", "sans-serif"],
         mono: ["'Space Mono'", "monospace"],
       },
       transitionTimingFunction: {

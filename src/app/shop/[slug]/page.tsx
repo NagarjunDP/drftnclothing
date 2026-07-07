@@ -245,7 +245,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     <img 
                       src={img} 
                       alt={`Thumbnail ${idx}`} 
-                      className="w-full h-full object-cover filter grayscale hover:filter-none" 
+                      className="w-full h-full object-cover" 
                       loading="lazy"
                     />
                   </button>
@@ -291,7 +291,27 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             <div className="border-t border-zinc-900 my-4"></div>
 
             {/* Description Summary */}
-            <p className="text-zinc-400 text-xs md:text-sm leading-relaxed">{product.description}</p>
+            {(() => {
+              const desc = product.description || '';
+              const hasTags = desc.includes('\n\nTags: ');
+              const cleanDesc = hasTags ? desc.split('\n\nTags: ')[0] : desc;
+              const tagsList = hasTags ? desc.split('\n\nTags: ')[1].split(', ').filter(Boolean) : [];
+
+              return (
+                <div className="space-y-4">
+                  <p className="text-zinc-400 text-xs md:text-sm leading-relaxed whitespace-pre-line">{cleanDesc}</p>
+                  {tagsList.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-2">
+                      {tagsList.map((tag) => (
+                        <span key={tag} className="text-[9px] uppercase font-bold tracking-widest px-2.5 py-1 bg-zinc-950 border border-zinc-900 text-zinc-500 rounded-sm font-mono">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           <div className="space-y-6 pt-4">

@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Product, Category } from '@/types';
-import { ArrowLeft, Trash2, ArrowLeftRight, Upload, Sparkles, MoveLeft, MoveRight, Star, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Trash2, ArrowLeftRight, Upload, Sparkles, MoveLeft, MoveRight, Star, HelpCircle, Camera, Loader2, Plus } from 'lucide-react';
 import { useToast } from '@/components/ToastContainer';
 import { useRouter } from 'next/navigation';
 import { db } from '@/lib/db';
+import { RGBA, getDominantColor, renderCompositeOnCanvas, rgbToHsl } from '@/lib/imageProcessor';
 
 interface ProductFormProps {
   initialData?: Product | null;
@@ -48,6 +49,24 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
   // Native Drag and Drop State
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
+  // AI & SEO Tags States
+  const [tagsInput, setTagsInput] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  
+  // Camera inputs & Preview canvas refs
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  const [processingImage, setProcessingImage] = useState<File | null>(null);
+  const [processingImgUrl, setProcessingImgUrl] = useState<string | null>(null);
+  const [dominantColor, setDominantColor] = useState<RGBA | null>(null);
+  const [activeBgOption, setActiveBgOption] = useState<'neutral' | 'dark' | 'gradient'>('neutral');
+  const [bgRemovalStatus, setBgRemovalStatus] = useState<string>('');
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
+  const [hasGeneratedDescription, setHasGeneratedDescription] = useState(false);
+
   // Fetch categories on load
   useEffect(() => {
     async function loadCategories() {
@@ -66,7 +85,19 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
     if (initialData) {
       setName(initialData.name);
       setSlug(initialData.slug);
-      setDescription(initialData.description || '');
+      
+      const desc = initialData.description || '';
+      if (desc.includes('\n\nTags: ')) {
+        const parts = desc.split('\n\nTags: ');
+        setDescription(parts[0]);
+        setTags(parts[1].split(', ').map(t => t.trim()));
+        setTagsInput(parts[1]);
+      } else {
+        setDescription(desc);
+        setTags([]);
+        setTagsInput('');
+      }
+
       setPrice((initialData.price / 100).toString());
       setComparePrice(initialData.compare_price ? (initialData.compare_price / 100).toString() : '');
       setCategory(initialData.category || '');
@@ -252,6 +283,397 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
     addToast('Image order updated', 'info');
   };
 
+  const handleTagsBlur = () => {
+    if (!tagsInput.trim()) {
+      setTags([]);
+      return;
+    }
+    const parsed = tagsInput.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+    setTags(parsed);
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    const updated = tags.filter(t => t !== tagToRemove);
+    setTags(updated);
+    setTagsInput(updated.join(', '));
+  };
+
+  // Intercept uploads or camera captures to run background removal
+  const processImageBackground = async (file: File) => {
+    if (file.size > 5 * 1024 * 1024) {
+      addToast(`"${file.name}" exceeds 5MB size limit.`, 'error');
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      addToast(`"${file.name}" has invalid format. Use JPEG, PNG, or WebP.`, 'error');
+      return;
+    }
+
+    setProcessingImage(file);
+    setIsRemovingBg(true);
+    setBgRemovalStatus('Downloading AI cutout model (first load takes a few seconds)...');
+
+    try {
+      // Import @imgly and onnxruntime-web
+      const [{ removeBackground }, ort] = await Promise.all([
+        import('@imgly/background-removal'),
+        // @ts-ignore
+        import('onnxruntime-web'),
+      ]);
+
+      // Serve WASM from /public/ort-wasm/ instead of webpack's broken relative path
+      ort.env.wasm.wasmPaths = '/ort-wasm/';
+      
+      setBgRemovalStatus('Processing clean cutout...');
+      const transparentBlob = await removeBackground(file, {
+        device: 'cpu',
+        model: 'isnet',
+        progress: (key: string, current: number, total: number) => {
+          const pct = Math.round((current / total) * 100);
+          setBgRemovalStatus(`Processing clean cutout... ${pct}%`);
+        }
+      });
+
+      const transparentUrl = URL.createObjectURL(transparentBlob);
+      setProcessingImgUrl(transparentUrl);
+
+      setBgRemovalStatus('Analyzing garment color palette...');
+      const img = new Image();
+      img.src = transparentUrl;
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to load cutout image element'));
+      });
+
+      const domColor = getDominantColor(img);
+      setDominantColor(domColor);
+      setIsRemovingBg(false);
+      setBgRemovalStatus('');
+    } catch (err: any) {
+      console.error(err);
+      addToast(`Failed to strip background: ${err.message || err}`, 'error');
+      setIsRemovingBg(false);
+      setBgRemovalStatus('');
+      setProcessingImage(null);
+    }
+  };
+
+  // Keep preview canvas updated as options toggle
+  useEffect(() => {
+    if (!processingImgUrl || !dominantColor || !previewCanvasRef.current) return;
+
+    const img = new Image();
+    img.src = processingImgUrl;
+    img.onload = () => {
+      renderCompositeOnCanvas({
+        canvas: previewCanvasRef.current!,
+        cutoutImg: img,
+        backgroundStyle: activeBgOption,
+        dominantColor,
+      });
+    };
+  }, [processingImgUrl, activeBgOption, dominantColor]);
+
+  const uploadRemainingImagesDirectly = async (validFiles: File[]) => {
+    setIsUploading(true);
+    setUploadingFiles((prev) => [
+      ...prev,
+      ...validFiles.map((f) => ({ name: f.name, progress: 0 })),
+    ]);
+
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    if (!cloudName) {
+      addToast('Cloudinary is not configured.', 'error');
+      setIsUploading(false);
+      return;
+    }
+
+    const uploadedUrls: string[] = [];
+
+    for (let i = 0; i < validFiles.length; i++) {
+      const file = validFiles[i];
+      const timestamp = Math.round(new Date().getTime() / 1000);
+      const folder = 'drftn-products';
+
+      try {
+        const signRes = await fetch('/api/admin/cloudinary-sign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ params: { timestamp, folder } })
+        });
+
+        if (!signRes.ok) throw new Error('Failed to get signature');
+        const signData = await signRes.json();
+
+        const url = await new Promise<string>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('api_key', signData.apiKey);
+          formData.append('timestamp', String(timestamp));
+          formData.append('signature', signData.signature);
+          formData.append('folder', folder);
+
+          xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) {
+              const progress = Math.round((event.loaded / event.total) * 100);
+              setUploadingFiles((prev) =>
+                prev.map((f) => (f.name === file.name ? { ...f, progress } : f))
+              );
+            }
+          });
+
+          xhr.addEventListener('load', () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              const res = JSON.parse(xhr.responseText);
+              resolve(res.secure_url);
+            } else {
+              reject(new Error('Cloudinary response error'));
+            }
+          });
+
+          xhr.addEventListener('error', () => reject(new Error('Network error')));
+          xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`);
+          xhr.send(formData);
+        });
+
+        const optimizedUrl = url.replace('/upload/', '/upload/f_auto,q_auto/');
+        uploadedUrls.push(optimizedUrl);
+      } catch (err) {
+        console.error(err);
+        addToast(`Failed to upload "${file.name}"`, 'error');
+      }
+    }
+
+    if (uploadedUrls.length > 0) {
+      setImages((prev) => [...prev, ...uploadedUrls]);
+      addToast(`${uploadedUrls.length} secondary image(s) uploaded successfully`, 'success');
+    }
+    setIsUploading(false);
+    setUploadingFiles((prev) => prev.filter((pf) => !validFiles.some((vf) => vf.name === pf.name)));
+  };
+
+  // Create high-res composite, upload to Cloudinary, and trigger description pre-fill
+  const handleApplyAndUpload = async () => {
+    if (!previewCanvasRef.current || !processingImage || !dominantColor) return;
+
+    setIsUploading(true);
+    setBgRemovalStatus('Generating studio composition...');
+
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 900;
+      canvas.height = 1200;
+
+      const img = new Image();
+      img.src = processingImgUrl!;
+      await new Promise<void>((resolve) => {
+        img.onload = () => resolve();
+      });
+
+      renderCompositeOnCanvas({
+        canvas,
+        cutoutImg: img,
+        backgroundStyle: activeBgOption,
+        dominantColor,
+      });
+
+      const compositeBlob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) => {
+            if (b) resolve(b);
+            else reject(new Error('Failed to output canvas blob'));
+          },
+          'image/jpeg',
+          0.9
+        );
+      });
+
+      setBgRemovalStatus('Uploading composite image...');
+      const timestamp = Math.round(new Date().getTime() / 1000);
+      const folder = 'drftn-products';
+
+      const signRes = await fetch('/api/admin/cloudinary-sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ params: { timestamp, folder } })
+      });
+
+      if (!signRes.ok) throw new Error('Failed to fetch Cloudinary API signature');
+      const signData = await signRes.json();
+
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+      const formData = new FormData();
+      formData.append('file', compositeBlob, `processed-${processingImage.name}`);
+      formData.append('api_key', signData.apiKey);
+      formData.append('timestamp', String(timestamp));
+      formData.append('signature', signData.signature);
+      formData.append('folder', folder);
+
+      const xhrRes = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            reject(new Error('Cloudinary response error'));
+          }
+        });
+        xhr.addEventListener('error', () => reject(new Error('Network upload failed')));
+        xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`);
+        xhr.send(formData);
+      });
+
+      const url = xhrRes.secure_url;
+      const optimizedUrl = url.replace('/upload/', `/upload/f_auto,q_auto/`);
+
+      setImages((prev) => [...prev, optimizedUrl]);
+      addToast('Studio image generated and added successfully', 'success');
+
+      // Auto-trigger description generation if first image
+      if (!hasGeneratedDescription) {
+        generateDescription(compositeBlob);
+        setHasGeneratedDescription(true);
+      }
+    } catch (err: any) {
+      console.error(err);
+      addToast(`Failed to save processed image: ${err.message || err}`, 'error');
+    } finally {
+      setIsUploading(false);
+      setBgRemovalStatus('');
+      setProcessingImage(null);
+      setProcessingImgUrl(null);
+      setDominantColor(null);
+    }
+  };
+
+  const handleUploadOriginal = async () => {
+    if (!processingImage) return;
+
+    setIsUploading(true);
+    setBgRemovalStatus('Uploading original image...');
+
+    try {
+      const timestamp = Math.round(new Date().getTime() / 1000);
+      const folder = 'drftn-products';
+
+      const signRes = await fetch('/api/admin/cloudinary-sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ params: { timestamp, folder } })
+      });
+
+      if (!signRes.ok) throw new Error('Failed to fetch Cloudinary API signature');
+      const signData = await signRes.json();
+
+      const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+      const formData = new FormData();
+      formData.append('file', processingImage);
+      formData.append('api_key', signData.apiKey);
+      formData.append('timestamp', String(timestamp));
+      formData.append('signature', signData.signature);
+      formData.append('folder', folder);
+
+      const xhrRes = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            reject(new Error('Cloudinary response error'));
+          }
+        });
+        xhr.addEventListener('error', () => reject(new Error('Network upload failed')));
+        xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`);
+        xhr.send(formData);
+      });
+
+      const url = xhrRes.secure_url;
+      const optimizedUrl = url.replace('/upload/', `/upload/f_auto,q_auto/`);
+
+      setImages((prev) => [...prev, optimizedUrl]);
+      addToast('Original image added successfully', 'success');
+
+      // Auto-trigger description generation if first image
+      if (!hasGeneratedDescription) {
+        generateDescription(processingImage);
+        setHasGeneratedDescription(true);
+      }
+    } catch (err: any) {
+      console.error(err);
+      addToast(`Upload failed: ${err.message || err}`, 'error');
+    } finally {
+      setIsUploading(false);
+      setBgRemovalStatus('');
+      setProcessingImage(null);
+      setProcessingImgUrl(null);
+      setDominantColor(null);
+    }
+  };
+
+  const generateDescription = async (imageFile: File | Blob) => {
+    setIsGeneratingDescription(true);
+    setBgRemovalStatus('Generating product description with Gemini Flash...');
+
+    try {
+      const img = new Image();
+      img.src = URL.createObjectURL(imageFile);
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to load image for description'));
+      });
+
+      // Compress preview for AI (384x384 JPEG)
+      const canvasSmall = document.createElement('canvas');
+      canvasSmall.width = 384;
+      canvasSmall.height = 384;
+      const ctxSmall = canvasSmall.getContext('2d');
+      if (ctxSmall) {
+        ctxSmall.drawImage(img, 0, 0, 384, 384);
+        const dataUrl = canvasSmall.toDataURL('image/jpeg', 0.85);
+        const compressedBase64 = dataUrl.split(',')[1];
+
+        const genRes = await fetch('/api/admin/generate-description', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: compressedBase64,
+            mimeType: 'image/jpeg'
+          })
+        });
+
+        if (genRes.ok) {
+          const genData = await genRes.json();
+          if (genData.warning) {
+            addToast(genData.warning, 'info');
+          }
+          if (genData.title) {
+            setName(genData.title);
+            const generatedSlug = genData.title
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/(^-|-$)+/g, '');
+            setSlug(generatedSlug);
+          }
+          if (genData.description) {
+            setDescription(genData.description);
+          }
+          if (genData.tags && genData.tags.length > 0) {
+            setTags(genData.tags);
+            setTagsInput(genData.tags.join(', '));
+          }
+          addToast('AI title, description, and tags generated!', 'success');
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      addToast(`Failed to generate AI copywriting: ${err.message || err}`, 'error');
+    } finally {
+      setIsGeneratingDescription(false);
+      setBgRemovalStatus('');
+    }
+  };
+
   const makePrimary = (index: number) => {
     if (index === 0) return;
     const reordered = [...images];
@@ -282,10 +704,14 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
         finalStock[size] = activeSizes.includes(size) ? (stock[size] || 0) : 0;
       });
 
+      const finalDescription = tags.length > 0 
+        ? `${description.trim()}\n\nTags: ${tags.join(', ')}`
+        : description.trim();
+
       const payload = {
         name: name.trim(),
         slug: slug.trim(),
-        description: description.trim(),
+        description: finalDescription,
         price: Math.round(Number(price) * 100), // convert to paise
         compare_price: comparePrice ? Math.round(Number(comparePrice) * 100) : undefined, // convert to paise
         category,
@@ -318,19 +744,25 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8 max-w-4xl animate-fade-in pb-16">
+    <form onSubmit={handleSubmit} className="space-y-8 max-w-4xl animate-fade-in pb-16 relative">
+      {/* Global progress indicator bar */}
+      {(isSaving || isUploading || isGeneratingDescription) && (
+        <div className="fixed top-0 left-0 w-full h-[3px] bg-zinc-100 z-[999] overflow-hidden">
+          <div className="bg-zinc-900 h-full animate-infinite-loading" />
+        </div>
+      )}
       
       {/* Header back */}
       <div className="flex items-center gap-4">
         <button
           type="button"
           onClick={() => router.push('/admin/products')}
-          className="p-2 border border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 text-zinc-400 hover:text-brand-offwhite rounded-md transition-colors"
+          className="p-2 border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-600 hover:text-zinc-900 rounded-md transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-extrabold tracking-widest uppercase text-brand-offwhite">
+          <h1 className="text-2xl font-extrabold tracking-widest uppercase text-zinc-900">
             {mode === 'create' ? 'New Product' : 'Edit Product'}
           </h1>
           <p className="text-zinc-500 text-sm mt-1">
@@ -338,14 +770,14 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
           </p>
         </div>
       </div>
-
+ 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left 2 Columns: Basic Form Info */}
         <div className="lg:col-span-2 space-y-6">
           
           {/* Main Info */}
-          <div className="bg-zinc-900/30 border border-zinc-800 p-6 md:p-8 space-y-6">
-            <h2 className="text-sm font-bold text-brand-offwhite uppercase tracking-widest border-b border-zinc-800 pb-3 flex items-center gap-2">
+          <div className="bg-white border border-zinc-200/80 shadow-sm p-6 md:p-8 space-y-6">
+            <h2 className="text-sm font-bold text-zinc-900 uppercase tracking-widest border-b border-zinc-200/60 pb-3 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-brand-red" />
               General Details
             </h2>
@@ -357,11 +789,11 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
                 placeholder="e.g. Essential Black Tee"
                 value={name}
                 onChange={handleNameChange}
-                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors"
+                className="w-full bg-zinc-50 border border-zinc-200 text-zinc-900 px-4 py-3 text-sm focus:outline-none focus:bg-white focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 transition-all"
                 required
               />
             </div>
-
+ 
             <div className="space-y-2">
               <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Slug URL path</label>
               <input
@@ -370,30 +802,85 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
                 onBlur={handleSlugBlur}
-                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors font-mono"
+                className="w-full bg-zinc-50 border border-zinc-200 text-zinc-900 px-4 py-3 text-sm focus:outline-none focus:bg-white focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 transition-all font-mono"
                 required
               />
             </div>
-
+ 
             <div className="space-y-2">
-              <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Description</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Description</label>
+                {images.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        setIsGeneratingDescription(true);
+                        setBgRemovalStatus('Generating product details with Gemini...');
+                        const res = await fetch(images[0]);
+                        const blob = await res.blob();
+                        await generateDescription(blob);
+                      } catch (err: any) {
+                        console.error(err);
+                        addToast(`Failed to parse cover image: ${err.message || err}`, 'error');
+                      } finally {
+                        setIsGeneratingDescription(false);
+                        setBgRemovalStatus('');
+                      }
+                    }}
+                    disabled={isGeneratingDescription || isUploading}
+                    className="text-[10px] uppercase font-bold tracking-widest text-zinc-900 hover:text-zinc-700 disabled:opacity-50 flex items-center gap-1 transition-colors"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Generate with AI
+                  </button>
+                )}
+              </div>
               <textarea
                 placeholder="Describe the product fit, fabric weight (e.g. 240 GSM heavy cotton), design aesthetic, details..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={5}
-                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors resize-none leading-relaxed"
+                className="w-full bg-zinc-50 border border-zinc-200 text-zinc-900 px-4 py-3 text-sm focus:outline-none focus:bg-white focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 transition-all resize-none leading-relaxed"
                 required
               />
+            </div>
+ 
+            <div className="space-y-2">
+              <label className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">SEO Search Tags (comma-separated)</label>
+              <input
+                type="text"
+                placeholder="e.g. oversized, distressed, premium fleece, boxy fit"
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+                onBlur={handleTagsBlur}
+                className="w-full bg-zinc-50 border border-zinc-200 text-zinc-900 px-4 py-3 text-sm focus:outline-none focus:bg-white focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 transition-all font-mono"
+              />
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {tags.map((tag) => (
+                    <span key={tag} className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 bg-zinc-100 text-zinc-600 border border-zinc-200/80 rounded-sm flex items-center gap-1.5">
+                      {tag}
+                      <button 
+                        type="button" 
+                        onClick={() => removeTag(tag)} 
+                        className="text-zinc-500 hover:text-brand-red font-mono leading-none text-xs"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
           {/* Sizing & Stock */}
-          <div className="bg-zinc-900/30 border border-zinc-800 p-6 md:p-8 space-y-6">
-            <h2 className="text-sm font-bold text-brand-offwhite uppercase tracking-widest border-b border-zinc-800 pb-3">
+          <div className="bg-white border border-zinc-200/80 shadow-sm p-6 md:p-8 space-y-6">
+            <h2 className="text-sm font-bold text-zinc-900 uppercase tracking-widest border-b border-zinc-200/60 pb-3">
               Sizes & Inventory Levels
             </h2>
-
+ 
             <div className="space-y-6">
               <div className="space-y-2">
                 <span className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Select Active Sizes</span>
@@ -407,8 +894,8 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
                         onClick={() => toggleSize(size)}
                         className={`w-12 h-12 font-mono font-bold text-xs border uppercase tracking-wider flex items-center justify-center transition-all ${
                           isActiveSize
-                            ? 'bg-brand-offwhite text-brand-black border-brand-offwhite'
-                            : 'bg-zinc-950 border-zinc-850 text-zinc-500 hover:border-zinc-700 hover:text-brand-offwhite'
+                            ? 'bg-zinc-900 text-white border-zinc-900'
+                            : 'bg-white border-zinc-200 text-zinc-500 hover:border-zinc-400 hover:text-zinc-900'
                         }`}
                       >
                         {size}
@@ -417,19 +904,19 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
                   })}
                 </div>
               </div>
-
+ 
               {activeSizes.length > 0 && (
-                <div className="space-y-4 pt-4 border-t border-zinc-900/60">
+                <div className="space-y-4 pt-4 border-t border-zinc-200/60">
                   <span className="text-xs uppercase tracking-wider text-zinc-500 font-bold block">Quantities in Stock</span>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     {activeSizes.map((size) => (
                       <div key={size} className="space-y-1">
-                        <label className="text-[10px] uppercase font-bold text-zinc-400 font-mono">Size {size} Qty</label>
+                        <label className="text-[10px] uppercase font-bold text-zinc-500 font-mono">Size {size} Qty</label>
                         <input
                           type="number"
                           value={stock[size] ?? 0}
                           onChange={(e) => handleStockChange(size, parseInt(e.target.value) || 0)}
-                          className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-3 py-2 text-sm focus:outline-none focus:border-brand-red font-mono"
+                          className="w-full bg-zinc-50 border border-zinc-200 text-zinc-900 px-3 py-2 text-sm focus:outline-none focus:bg-white focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 transition-all font-mono"
                           min="0"
                           required
                         />
@@ -442,9 +929,9 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
           </div>
 
           {/* Cloudinary Image Uploader */}
-          <div className="bg-zinc-900/30 border border-zinc-800 p-6 md:p-8 space-y-6">
+          <div className="bg-white border border-zinc-200/80 shadow-sm p-6 md:p-8 space-y-6">
             <div>
-              <h2 className="text-sm font-bold text-brand-offwhite uppercase tracking-widest flex items-center gap-2">
+              <h2 className="text-sm font-bold text-zinc-900 uppercase tracking-widest flex items-center gap-2">
                 Product Media
                 <span className="text-[10px] text-zinc-500 font-normal lowercase">(JPEG, PNG, WebP — max 5MB per file)</span>
               </h2>
@@ -452,46 +939,237 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
             </div>
 
             <div className="space-y-6">
-              {/* Drag and Drop Upload Area */}
-              <label 
-                className="border-2 border-dashed border-zinc-800 hover:border-zinc-700 bg-zinc-950/20 hover:bg-zinc-950/40 p-8 text-center rounded-lg cursor-pointer flex flex-col items-center justify-center gap-2 group transition-all duration-300"
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (e.dataTransfer.files) {
-                    handleImageUpload({ target: { files: e.dataTransfer.files } } as any);
+              {/* Hidden inputs */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const files = e.target.files;
+                  if (!files || files.length === 0) return;
+                  
+                  // The first file goes into the AI Studio modal
+                  processImageBackground(files[0]);
+
+                  // Upload remaining files directly in the background
+                  if (files.length > 1) {
+                    const validFiles: File[] = [];
+                    for (let i = 1; i < files.length; i++) {
+                      const file = files[i];
+                      if (file.size <= 5 * 1024 * 1024 && ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                        validFiles.push(file);
+                      }
+                    }
+                    if (validFiles.length > 0) {
+                      uploadRemainingImagesDirectly(validFiles);
+                    }
                   }
                 }}
-              >
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                  disabled={isUploading}
-                />
-                <Upload className="w-8 h-8 text-zinc-500 group-hover:text-brand-red transition-colors" />
-                <span className="text-xs font-bold uppercase tracking-wider text-brand-offwhite">
-                  {isUploading ? 'Uploading to Cloudinary...' : 'Select streetwear images'}
-                </span>
-                <span className="text-[10px] text-zinc-500">Drag & drop files or click to browse</span>
-              </label>
+              />
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    processImageBackground(e.target.files[0]);
+                  }
+                }}
+              />
+
+              {!processingImage ? (
+                /* Drag and Drop Upload Area */
+                <div 
+                  className="border-2 border-dashed border-zinc-200 bg-zinc-50/50 hover:bg-zinc-50 p-8 text-center rounded-lg flex flex-col items-center justify-center gap-4 transition-all duration-300"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      processImageBackground(e.dataTransfer.files[0]);
+                    }
+                  }}
+                >
+                  <Upload className="w-8 h-8 text-zinc-400" />
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-800 block">
+                      Add Product Image
+                    </span>
+                    <span className="text-[10px] text-zinc-500 block">Drag & drop garment photo here, or use options below:</span>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-3 justify-center pt-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-4 py-2 bg-white border border-zinc-200 text-zinc-650 hover:text-zinc-900 hover:border-zinc-350 text-xs font-bold uppercase tracking-wider rounded transition-colors flex items-center gap-2 shadow-sm"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Upload Photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="px-4 py-2 bg-white border border-zinc-200 text-zinc-650 hover:text-zinc-900 hover:border-zinc-350 text-xs font-bold uppercase tracking-wider rounded transition-colors flex items-center gap-2 shadow-sm"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-brand-red" />
+                      Take Photo
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* AI Studio Studio Builder */
+                <div className="bg-white border border-zinc-200 p-6 rounded-lg space-y-6 shadow-md">
+                  <div className="flex items-center justify-between border-b border-zinc-150 pb-3">
+                    <div className="space-y-0.5">
+                      <span className="text-xs uppercase font-extrabold tracking-widest text-zinc-900 flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-brand-amber animate-pulse" />
+                        AI Streetwear Studio
+                      </span>
+                      <p className="text-[10px] text-zinc-500 font-mono truncate max-w-[280px]">File: {processingImage.name}</p>
+                    </div>
+                    {(isRemovingBg || isUploading || isGeneratingDescription) && (
+                      <span className="text-[10px] uppercase font-bold text-brand-red tracking-wider font-mono flex items-center gap-1.5">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Active
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Loading Progress State */}
+                  {bgRemovalStatus && (
+                    <div className="space-y-2 bg-zinc-50 p-4 border border-zinc-200 rounded-md">
+                      <span className="text-[10px] uppercase font-bold text-zinc-500 font-mono tracking-widest block">
+                        Processing details...
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <Loader2 className="w-4 h-4 animate-spin text-brand-red shrink-0" />
+                        <span className="text-xs text-zinc-600 font-body">{bgRemovalStatus}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isRemovingBg && processingImgUrl && dominantColor && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                      {/* Interactive Composite Preview Canvas */}
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider font-mono">Real-time studio composite</span>
+                        <canvas 
+                          ref={previewCanvasRef} 
+                          className="w-full max-w-[220px] aspect-[3/4] border border-zinc-200 bg-zinc-50 rounded shadow-lg transition-all duration-300"
+                          width={450}
+                          height={600}
+                        />
+                      </div>
+
+                      {/* Backdrop Choice Panels */}
+                      <div className="space-y-4">
+                        <span className="text-xs uppercase font-bold text-zinc-500 tracking-wider block border-b border-zinc-150 pb-2">Select Studio Backdrop</span>
+                        <div className="grid grid-cols-1 gap-2.5">
+                          <button
+                            type="button"
+                            onClick={() => setActiveBgOption('neutral')}
+                            className={`p-3 border rounded text-left transition-all ${
+                              activeBgOption === 'neutral'
+                                ? 'bg-zinc-50 border-zinc-900 text-zinc-900 shadow-sm'
+                                : 'bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:text-zinc-800'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold uppercase tracking-wider">Matched Neutral</span>
+                              <div className="w-3.5 h-3.5 rounded-full border border-zinc-800" style={{ backgroundColor: `hsl(${rgbToHsl(dominantColor.r, dominantColor.g, dominantColor.b).h}, 10%, 93%)` }} />
+                            </div>
+                            <p className="text-[10px] text-zinc-500 mt-1">Soft complementary desaturated tone derived from garment pixels.</p>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setActiveBgOption('dark')}
+                            className={`p-3 border rounded text-left transition-all ${
+                              activeBgOption === 'dark'
+                                ? 'bg-zinc-900 border-zinc-900 text-white'
+                                : 'bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:text-zinc-800'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold uppercase tracking-wider">Charcoal Brand Dark</span>
+                              <div className="w-3.5 h-3.5 rounded-full border border-zinc-800 bg-[#121212]" />
+                            </div>
+                            <p className="text-[10px] text-zinc-500 mt-1">Standard dark studio catalog backdrop (#121212).</p>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setActiveBgOption('gradient')}
+                            className={`p-3 border rounded text-left transition-all ${
+                              activeBgOption === 'gradient'
+                                ? 'bg-zinc-50 border-zinc-900 text-zinc-900 shadow-sm'
+                                : 'bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:text-zinc-800'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold uppercase tracking-wider">Studio Soft Gradient</span>
+                              <div className="w-3.5 h-3.5 rounded-full border border-zinc-800" style={{ background: `linear-gradient(135deg, hsl(${rgbToHsl(dominantColor.r, dominantColor.g, dominantColor.b).h}, 15%, 88%), hsl(${rgbToHsl(dominantColor.r, dominantColor.g, dominantColor.b).h}, 8%, 70%))` }} />
+                            </div>
+                            <p className="text-[10px] text-zinc-500 mt-1">Responsive radial light dispersion centering the product details.</p>
+                          </button>
+                        </div>
+
+                        {/* Interactive triggers */}
+                        <div className="flex gap-3 pt-3 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={handleApplyAndUpload}
+                            disabled={isUploading}
+                            className="flex-[2] bg-white hover:bg-zinc-50 text-zinc-900 border border-zinc-900 text-[11px] font-extrabold uppercase tracking-widest py-2.5 px-4 rounded shadow-sm transition-all disabled:opacity-50 disabled:bg-zinc-50 disabled:text-zinc-400 disabled:border-zinc-200 min-w-[150px]"
+                          >
+                            {isUploading ? 'Uploading...' : 'Apply & Add to Gallery'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleUploadOriginal}
+                            disabled={isUploading}
+                            className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-bold uppercase tracking-widest py-2.5 px-4 rounded transition-all disabled:opacity-50 whitespace-nowrap shadow-sm disabled:bg-zinc-150 disabled:text-zinc-400"
+                            title="Skip AI Cutout and use the original image"
+                          >
+                            Use Original
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setProcessingImage(null);
+                              setProcessingImgUrl(null);
+                              setDominantColor(null);
+                            }}
+                            disabled={isUploading}
+                            className="px-4 py-2.5 border border-zinc-200 hover:border-zinc-300 text-zinc-500 hover:text-zinc-900 text-[11px] font-bold uppercase tracking-widest rounded transition-colors disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Progress Bar View */}
               {uploadingFiles.length > 0 && (
-                <div className="space-y-3 bg-zinc-950 p-4 border border-zinc-850 rounded">
-                  <span className="text-xs uppercase font-bold text-zinc-400 font-mono tracking-wider block">Uploading Files ({uploadingFiles.length})</span>
+                <div className="space-y-3 bg-zinc-50 p-4 border border-zinc-200 rounded">
+                  <span className="text-xs uppercase font-bold text-zinc-500 font-mono tracking-wider block">Uploading Files ({uploadingFiles.length})</span>
                   <div className="space-y-2">
                     {uploadingFiles.map((file, idx) => (
                       <div key={idx} className="space-y-1">
-                        <div className="flex justify-between text-[10px] text-zinc-400 font-mono">
+                        <div className="flex justify-between text-[10px] text-zinc-500 font-mono">
                           <span className="truncate max-w-[200px]">{file.name}</span>
                           <span>{file.progress}%</span>
                         </div>
-                        <div className="w-full bg-zinc-900 h-1 rounded-full overflow-hidden">
+                        <div className="w-full bg-zinc-200 h-1 rounded-full overflow-hidden">
                           <div 
-                            className="bg-brand-red h-full transition-all duration-200" 
+                            className="bg-zinc-900 h-full transition-all duration-200" 
                             style={{ width: `${file.progress}%` }}
                           />
                         </div>
@@ -524,15 +1202,16 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
                           onDragStart={() => handleDragStart(idx)}
                           onDragOver={handleDragOver}
                           onDrop={() => handleDrop(idx)}
-                          className={`relative aspect-[3/4] bg-zinc-950 border border-zinc-800 group rounded-md overflow-hidden cursor-move transition-all duration-300 ${
-                            draggedIndex === idx ? 'opacity-40 scale-95 border-brand-red' : ''
-                          } ${isDragTarget ? 'hover:border-zinc-500' : ''}`}
+                          className={`relative aspect-[3/4] bg-zinc-50 border border-zinc-200 group rounded-md overflow-hidden cursor-move transition-all duration-300 ${
+                            draggedIndex === idx ? 'opacity-40 scale-95 border-zinc-900' : ''
+                          } ${isDragTarget ? 'hover:border-zinc-400' : ''}`}
+                          onClick={() => makePrimary(idx)}
                         >
-                          <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover select-none pointer-events-none" />
+                          <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover select-none pointer-events-none hover:opacity-90 transition-opacity" />
                           
                           {/* Top-left Indicator (Cover status) */}
                           {idx === 0 && (
-                            <div className="absolute top-2 left-2 bg-brand-red text-white text-[9px] font-bold px-1.5 py-0.5 rounded font-mono uppercase tracking-wider shadow">
+                            <div className="absolute top-2 left-2 bg-zinc-900 text-white text-[9px] font-bold px-1.5 py-0.5 rounded font-mono uppercase tracking-wider shadow">
                               Cover
                             </div>
                           )}
@@ -572,7 +1251,7 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
                       );
                     })}
                   </div>
-                  <p className="text-[10px] text-zinc-650 italic mt-2">
+                  <p className="text-[10px] text-zinc-550 italic mt-2">
                     * Tip: Drag and drop preview frames to adjust sequence order on the product details page.
                   </p>
                 </div>
@@ -585,8 +1264,8 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
         <div className="space-y-6">
           
           {/* Pricing */}
-          <div className="bg-zinc-900/30 border border-zinc-800 p-6 md:p-8 space-y-6">
-            <h2 className="text-sm font-bold text-brand-offwhite uppercase tracking-widest border-b border-zinc-800 pb-3">
+          <div className="bg-white border border-zinc-200/80 shadow-sm p-6 md:p-8 space-y-6">
+            <h2 className="text-sm font-bold text-zinc-900 uppercase tracking-widest border-b border-zinc-200/60 pb-3">
               Pricing Details
             </h2>
 
@@ -599,7 +1278,7 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
                   placeholder="e.g. 1299"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite pl-9 pr-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors font-mono"
+                  className="w-full bg-zinc-50 border border-zinc-200 text-zinc-900 pl-9 pr-4 py-3 text-sm focus:outline-none focus:bg-white focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 transition-all font-mono"
                   required
                   min="1"
                 />
@@ -615,19 +1294,19 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
                   placeholder="e.g. 1999"
                   value={comparePrice}
                   onChange={(e) => setComparePrice(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite pl-9 pr-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors font-mono"
+                  className="w-full bg-zinc-50 border border-zinc-200 text-zinc-900 pl-9 pr-4 py-3 text-sm focus:outline-none focus:bg-white focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 transition-all font-mono"
                   min="0"
                 />
               </div>
-              <p className="text-[10px] text-zinc-600 leading-normal">
+              <p className="text-[10px] text-zinc-500 leading-normal">
                 Strikethrough price. Leave blank if the product is not on discount.
               </p>
             </div>
           </div>
 
           {/* Classification */}
-          <div className="bg-zinc-900/30 border border-zinc-800 p-6 md:p-8 space-y-6">
-            <h2 className="text-sm font-bold text-brand-offwhite uppercase tracking-widest border-b border-zinc-800 pb-3">
+          <div className="bg-white border border-zinc-200/80 shadow-sm p-6 md:p-8 space-y-6">
+            <h2 className="text-sm font-bold text-zinc-900 uppercase tracking-widest border-b border-zinc-200/60 pb-3">
               Classification
             </h2>
 
@@ -639,7 +1318,7 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
                   setCategory(e.target.value);
                   setSubcategory(''); // Reset subcategory when category changes
                 }}
-                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors uppercase tracking-wider font-bold"
+                className="w-full bg-zinc-50 border border-zinc-200 text-zinc-900 px-4 py-3 text-sm focus:outline-none focus:bg-white focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 transition-all uppercase tracking-wider font-bold"
                 required
               >
                 <option value="" disabled>[Select Category]</option>
@@ -661,7 +1340,7 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
                   <select
                     value={subcategory}
                     onChange={(e) => setSubcategory(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors uppercase tracking-wider font-bold"
+                    className="w-full bg-zinc-50 border border-zinc-200 text-zinc-900 px-4 py-3 text-sm focus:outline-none focus:bg-white focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 transition-all uppercase tracking-wider font-bold"
                   >
                     <option value="">[None] — No Subcategory</option>
                     {subs.map((sub) => (
@@ -679,7 +1358,7 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
               <select
                 value={gender}
                 onChange={(e) => setGender(e.target.value as any)}
-                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors uppercase tracking-wider font-bold"
+                className="w-full bg-zinc-50 border border-zinc-200 text-zinc-900 px-4 py-3 text-sm focus:outline-none focus:bg-white focus:border-zinc-950 focus:ring-1 focus:ring-zinc-950 transition-all uppercase tracking-wider font-bold"
               >
                 {GENDERS.map((g) => (
                   <option key={g} value={g}>
@@ -691,34 +1370,34 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
           </div>
 
           {/* Visibility Controls */}
-          <div className="bg-zinc-900/30 border border-zinc-800 p-6 md:p-8 space-y-4">
-            <h2 className="text-sm font-bold text-brand-offwhite uppercase tracking-widest border-b border-zinc-800 pb-3 mb-2">
+          <div className="bg-white border border-zinc-200/80 shadow-sm p-6 md:p-8 space-y-4">
+            <h2 className="text-sm font-bold text-zinc-900 uppercase tracking-widest border-b border-zinc-200/60 pb-3 mb-2">
               Publishing Options
             </h2>
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <span className="text-xs uppercase font-bold text-brand-offwhite">Featured piece</span>
+                <span className="text-xs uppercase font-bold text-zinc-900">Featured piece</span>
                 <p className="text-[10px] text-zinc-500">Show on homepage featured rows</p>
               </div>
               <input
                 type="checkbox"
                 checked={isFeatured}
                 onChange={(e) => setIsFeatured(e.target.checked)}
-                className="rounded border-zinc-850 bg-zinc-950 text-brand-red focus:ring-brand-red w-4 h-4 cursor-pointer"
+                className="rounded border-zinc-300 bg-white text-zinc-900 focus:ring-zinc-900 w-4 h-4 cursor-pointer"
               />
             </div>
 
-            <div className="flex items-center justify-between pt-2 border-t border-zinc-900/60">
+            <div className="flex items-center justify-between pt-2 border-t border-zinc-200/60">
               <div className="space-y-0.5">
-                <span className="text-xs uppercase font-bold text-brand-offwhite">Is Active</span>
+                <span className="text-xs uppercase font-bold text-zinc-900">Is Active</span>
                 <p className="text-[10px] text-zinc-500">Make visible to consumers immediately</p>
               </div>
               <input
                 type="checkbox"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
-                className="rounded border-zinc-850 bg-zinc-950 text-brand-red focus:ring-brand-red w-4 h-4 cursor-pointer"
+                className="rounded border-zinc-300 bg-white text-zinc-900 focus:ring-zinc-900 w-4 h-4 cursor-pointer"
               />
             </div>
           </div>
@@ -727,10 +1406,73 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
           <button
             type="submit"
             disabled={isSaving}
-            className="w-full bg-brand-red hover:bg-brand-red/90 text-white font-extrabold uppercase tracking-widest text-xs py-4 px-6 rounded shadow-lg shadow-brand-red/25 disabled:opacity-50 transition-all duration-300"
+            className="w-full bg-white hover:bg-zinc-50 text-zinc-900 border border-zinc-900 font-extrabold uppercase tracking-widest text-xs py-4 px-6 rounded shadow-sm disabled:opacity-50 disabled:bg-zinc-50 disabled:text-zinc-400 disabled:border-zinc-200 transition-all duration-300 flex items-center justify-center gap-2"
           >
+            {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-900" />}
             {isSaving ? 'Saving Piece...' : mode === 'create' ? 'Publish Piece' : 'Save Changes'}
           </button>
+        </div>
+      </div>
+
+      {/* Live storefront catalog card preview */}
+      <div className="border-t border-zinc-200 pt-8 mt-12 space-y-6">
+        <div>
+          <h2 className="text-sm font-extrabold text-zinc-900 uppercase tracking-widest flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-brand-amber" />
+            Live Storefront Grid Preview
+          </h2>
+          <p className="text-xs text-zinc-500 mt-1">
+            Shows exactly how this garment renders on the live COLLECTIONS store listing grid (refreshes in real-time).
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-sm sm:max-w-none">
+          <div className="group flex flex-col product-card border border-zinc-200 bg-white p-4 rounded-md shadow-sm">
+            {/* Image Container */}
+            <div className="product-card-image bg-zinc-50 relative overflow-hidden aspect-[3/4]">
+              {images[0] ? (
+                <img
+                  src={images[0]}
+                  alt={name || 'Preview Piece'}
+                  className="w-full h-full object-cover transition-transform duration-700 ease-luxury"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-zinc-400 bg-zinc-50 text-[10px] uppercase font-bold tracking-widest font-mono p-4 text-center">
+                  <span>No cover image</span>
+                  <span className="text-[8px] text-zinc-500 font-normal lowercase mt-1">(upload / process image above)</span>
+                </div>
+              )}
+              
+              <div className="product-card-overlay" aria-hidden="true" />
+
+              {/* Sale/Discount Badge */}
+              {comparePrice && Number(comparePrice) > Number(price) && (
+                <span className="absolute top-3 left-3 border border-zinc-200 bg-zinc-900/90 text-white text-[9px] tracking-[0.2em] font-semibold py-1 px-2.5 uppercase backdrop-blur-sm z-10">
+                  Sale
+                </span>
+              )}
+            </div>
+
+            {/* Product Details */}
+            <div className="pt-3 space-y-1">
+              <p className="text-[9px] text-zinc-500 uppercase tracking-[0.2em] font-semibold">
+                {category || '[Category]'}
+              </p>
+              <h3 className="text-xs font-semibold text-zinc-800 tracking-wide uppercase line-clamp-1 group-hover:text-brand-red transition-colors duration-200 font-body">
+                {name || 'Untitled Streetwear Piece'}
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-zinc-900 font-body">
+                  ₹{Number(price) ? Number(price).toLocaleString('en-IN') : '0'}
+                </span>
+                {comparePrice && Number(comparePrice) > Number(price) && (
+                  <span className="text-[10px] text-zinc-400 line-through font-mono">
+                    ₹{Number(comparePrice).toLocaleString('en-IN')}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </form>
