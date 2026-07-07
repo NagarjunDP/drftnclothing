@@ -61,15 +61,17 @@ export default function HeroSection(props: HeroSectionProps) {
 
     scrollLayers.forEach((layer) => {
       const depth = parseFloat(layer.getAttribute('data-depth') || '0');
+      const maxShift = isTouchDevice ? depth * 40 : depth * 110;
       const tween = gsap.to(layer, {
         scrollTrigger: {
           trigger: hero,
           start: 'top top',
           end: 'bottom top',
-          scrub: true,
+          scrub: isTouchDevice ? 1.8 : 1, // smooth liquid interpolation on touch
         },
-        y: -depth * 110, // vertical shift
-        ease: 'none',
+        y: -maxShift, // vertical shift
+        ease: 'power1.out',
+        force3D: true, // GPU acceleration
       });
       if (tween.scrollTrigger) {
         scrollTriggersList.push(tween.scrollTrigger);
@@ -142,20 +144,22 @@ export default function HeroSection(props: HeroSectionProps) {
       }
     );
 
-    // Drift in Style container subtle leftward (inward) drift on scroll (emerges behind model)
+    // Drift in Style container rightward (outward) drift on scroll
     const driftContainer = hero.querySelector('.hero-drift-container');
     if (driftContainer) {
       const driftTween = gsap.fromTo(driftContainer,
-        { x: 100 },
+        { x: 0, opacity: 1 },
         {
           scrollTrigger: {
             trigger: hero,
             start: 'top top',
-            end: '+=300', // completes quickly within 300px of scrolling
-            scrub: 1, // smooth eased catch-up
+            end: '+=400', // completes quickly within 400px of scrolling
+            scrub: isTouchDevice ? 1.8 : 1, // smooth eased catch-up
           },
-          x: -30, // slides leftward behind the model torso
-          ease: 'power1.out',
+          x: isTouchDevice ? 160 : 320, // slides outward to the right
+          opacity: 0, // fades out as it slides out of the hero boundary
+          ease: 'power1.inOut',
+          force3D: true, // GPU acceleration
         }
       );
       if (driftTween.scrollTrigger) {
@@ -187,8 +191,8 @@ export default function HeroSection(props: HeroSectionProps) {
       <div className="absolute inset-0 z-0 overflow-hidden select-none pointer-events-none">
         
         {/* Layer 1 (Backmost - Skyline silhouette) */}
-        <div className="absolute inset-0 w-full h-full hero-scroll-layer" data-depth="0.1">
-          <div className="absolute inset-0 w-full h-full hero-cursor-layer" data-depth="0.1">
+        <div className="absolute inset-0 w-full h-full hero-scroll-layer" data-depth="0.1" style={{ willChange: 'transform' }}>
+          <div className="absolute inset-0 w-full h-full hero-cursor-layer" data-depth="0.1" style={{ willChange: 'transform' }}>
             <Image
               src="/layer1.png"
               alt="DRFTN Hero Layer 1 - Skyline"
@@ -201,8 +205,8 @@ export default function HeroSection(props: HeroSectionProps) {
         </div>
 
         {/* Layer 2 (Street environment/signage) */}
-        <div className="absolute inset-0 w-full h-full hero-scroll-layer" data-depth="0.25">
-          <div className="absolute inset-0 w-full h-full hero-cursor-layer hero-layer-neon" data-depth="0.25">
+        <div className="absolute inset-0 w-full h-full hero-scroll-layer" data-depth="0.25" style={{ willChange: 'transform' }}>
+          <div className="absolute inset-0 w-full h-full hero-cursor-layer hero-layer-neon" data-depth="0.25" style={{ willChange: 'transform' }}>
             <Image
               src="/layer2.png"
               alt="DRFTN Hero Layer 2 - Street"
@@ -215,8 +219,8 @@ export default function HeroSection(props: HeroSectionProps) {
         </div>
 
         {/* ── Transitional Beat: Drift in Style (Layer 2.5: Physically behind Layer 3 model) ── */}
-        <div className="absolute inset-0 w-full h-full hero-scroll-layer" data-depth="0.35">
-          <div className="absolute inset-0 w-full h-full hero-cursor-layer" data-depth="0.35">
+        <div className="absolute inset-0 w-full h-full hero-scroll-layer" data-depth="0.35" style={{ willChange: 'transform' }}>
+          <div className="absolute inset-0 w-full h-full hero-cursor-layer" data-depth="0.35" style={{ willChange: 'transform' }}>
             <div className="absolute top-[28%] md:top-[32%] right-[6%] sm:right-[8%] md:right-[10%] lg:right-[12%] z-10 pointer-events-none hero-drift-container text-right flex flex-col items-end select-none">
               <span className="hero-drift-word opacity-0 block font-body font-light italic text-zinc-400 text-[clamp(1.8rem,8vw,3rem)] sm:text-[clamp(2.5rem,7vw,4rem)] lg:text-[clamp(3.8rem,5.5vw,4.8rem)] leading-[0.8] tracking-tighter uppercase">
                 Drift
@@ -232,8 +236,8 @@ export default function HeroSection(props: HeroSectionProps) {
         </div>
 
         {/* Layer 3 (Model - Subject) */}
-        <div className="absolute inset-0 w-full h-full hero-scroll-layer" data-depth="0.45">
-          <div className="absolute inset-0 w-full h-full hero-cursor-layer" data-depth="0.45">
+        <div className="absolute inset-0 w-full h-full hero-scroll-layer" data-depth="0.45" style={{ willChange: 'transform' }}>
+          <div className="absolute inset-0 w-full h-full hero-cursor-layer" data-depth="0.45" style={{ willChange: 'transform' }}>
             <Image
               src="/layer3.png"
               alt="DRFTN Hero Layer 3 - Model"
@@ -246,11 +250,11 @@ export default function HeroSection(props: HeroSectionProps) {
         </div>
 
         {/* Layer 4 (Atmospheric particles - chains/mist) */}
-        <div className="absolute inset-0 w-full h-full hero-scroll-layer" data-depth="0.7">
+        <div className="absolute inset-0 w-full h-full hero-scroll-layer" data-depth="0.7" style={{ willChange: 'transform' }}>
           <div 
             className="absolute inset-0 w-full h-full hero-cursor-layer" 
             data-depth="0.7"
-            style={{ mixBlendMode: 'screen', opacity: 0.2 }}
+            style={{ mixBlendMode: 'screen', opacity: 0.2, willChange: 'transform' }}
           >
             <Image
               src="/layer4.png"
@@ -264,11 +268,11 @@ export default function HeroSection(props: HeroSectionProps) {
         </div>
 
         {/* Layer 5 (Foreground rain/bokeh) */}
-        <div className="absolute inset-0 w-full h-full hero-scroll-layer" data-depth="1.0">
+        <div className="absolute inset-0 w-full h-full hero-scroll-layer" data-depth="1.0" style={{ willChange: 'transform' }}>
           <div 
             className="absolute inset-0 w-full h-full hero-cursor-layer" 
             data-depth="1.0"
-            style={{ mixBlendMode: 'screen', opacity: 0.25 }}
+            style={{ mixBlendMode: 'screen', opacity: 0.25, willChange: 'transform' }}
           >
             <Image
               src="/layer5.png"
