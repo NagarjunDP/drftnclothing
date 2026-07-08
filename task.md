@@ -1,10 +1,19 @@
-# Redesign Task Checklist — Master visual/UX Overhaul (Phase 1: Homepage)
+# COD Pre-orders & Security Hardening Checklist
 
-- [x] **Phase 1: Homepage Redesign**
-  - [x] Standardize Hero buttons and CTAs to sharp-edged (`rounded-none`) elements
-  - [x] Replace stats bar with slow-scrolling campaign marquee ticker
-  - [x] Update Categories section to reflect unisex departments (Hoodies, Outerwear, Bottoms, Tees, Accessories)
-  - [x] Build an asymmetric lookbook layout for the Featured Drops grid (staggered editorial layout)
-  - [x] Redesign Product Cards on homepage: borderless grids, clean metadata layouts, sharp hover events
-  - [x] Standardize brand story section and values buttons to conform with style audit
-  - [x] Compile and verify server builds (`npm run build`)
+- [x] **Database Schema & Logic Sync**
+  - [x] Added columns `payment_type`, `deposit_amount`, `remaining_amount`, `deposit_status`, and `verified_phone` to the orders table.
+  - [x] Implemented phone OTP verification logic for Cash on Delivery.
+  - [x] Set COD orders initially as `pending_payment` until ₹200 deposit is captured.
+- [x] **User Interface Updates**
+  - [x] Added COD deposit, balance due, and OTP verification status badge to admin order pages.
+  - [x] Added paid booking deposit and remaining balance breakdown to customer order tracking page.
+- [x] **Sentry Error Monitoring**
+  - [x] Configured Sentry client, server, and edge options.
+  - [x] Set up error filtering for localhost and browser extensions.
+  - [x] Implemented contextual tagging (`user_id`, `payment_method`, `order_id`).
+- [x] **Security Hardening Verification**
+  - [x] Test 1: Invalid Razorpay webhook signatures rejected with 400.
+  - [x] Test 2: Standardized security headers (CSP, HSTS, XFO: DENY, nosniff).
+  - [x] Test 3: Enforced database SSL modes.
+  - [x] Test 4: Concurrency row locking using Drizzle `.for('update')`.
+  - [x] Test 5: Rate limiting triggers 429 response codes.

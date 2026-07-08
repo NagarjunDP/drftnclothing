@@ -195,7 +195,7 @@ export default function CategoryForm({ initialData, mode }: CategoryFormProps) {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-zinc-900/30 border border-zinc-800 p-6 md:p-8 space-y-6">
             <h2 className="text-sm font-bold text-brand-offwhite uppercase tracking-widest border-b border-zinc-800 pb-3 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-brand-red" />
+              <Sparkles className="w-4 h-4 text-white" />
               Category Details
             </h2>
 
@@ -206,7 +206,7 @@ export default function CategoryForm({ initialData, mode }: CategoryFormProps) {
                 placeholder="e.g. Hoodies"
                 value={name}
                 onChange={handleNameChange}
-                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors"
+                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-white transition-colors"
                 required
               />
             </div>
@@ -219,7 +219,7 @@ export default function CategoryForm({ initialData, mode }: CategoryFormProps) {
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
                 onBlur={handleSlugBlur}
-                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors font-mono"
+                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-white transition-colors font-mono"
                 required
               />
             </div>
@@ -229,7 +229,7 @@ export default function CategoryForm({ initialData, mode }: CategoryFormProps) {
               <select
                 value={parentId}
                 onChange={(e) => setParentId(e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors font-bold uppercase tracking-wider"
+                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-white transition-colors font-bold uppercase tracking-wider"
               >
                 <option value="">[None] — Set as Top-Level Category</option>
                 {categoriesList.map((cat) => (
@@ -248,7 +248,7 @@ export default function CategoryForm({ initialData, mode }: CategoryFormProps) {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors resize-none leading-relaxed"
+                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-white transition-colors resize-none leading-relaxed"
               />
             </div>
             
@@ -259,7 +259,7 @@ export default function CategoryForm({ initialData, mode }: CategoryFormProps) {
                 placeholder="0"
                 value={displayOrder}
                 onChange={(e) => setDisplayOrder(Number(e.target.value))}
-                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors font-mono"
+                className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-white transition-colors font-mono"
               />
             </div>
           </div>
@@ -278,7 +278,7 @@ export default function CategoryForm({ initialData, mode }: CategoryFormProps) {
                   className="hidden"
                   disabled={isUploading}
                 />
-                <Upload className="w-8 h-8 text-zinc-500 group-hover:text-brand-red transition-colors" />
+                <Upload className="w-8 h-8 text-zinc-500 group-hover:text-white transition-colors" />
                 <span className="text-xs font-bold uppercase tracking-wider text-brand-offwhite">
                   {isUploading ? 'Uploading to Cloudinary...' : 'Select image'}
                 </span>
@@ -291,7 +291,7 @@ export default function CategoryForm({ initialData, mode }: CategoryFormProps) {
                     <button
                       type="button"
                       onClick={() => setImageUrl('')}
-                      className="p-2 h-max bg-brand-black/80 hover:bg-brand-red text-zinc-400 hover:text-white rounded transition-colors"
+                      className="p-2 h-max bg-brand-black/80 hover:bg-zinc-850 text-zinc-400 hover:text-white rounded transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -317,7 +317,7 @@ export default function CategoryForm({ initialData, mode }: CategoryFormProps) {
                 type="checkbox"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
-                className="rounded border-zinc-850 bg-zinc-950 text-brand-red focus:ring-brand-red w-4 h-4 cursor-pointer"
+                className="rounded border-zinc-850 bg-zinc-950 text-white focus:ring-white w-4 h-4 cursor-pointer"
               />
             </div>
           </div>
@@ -325,7 +325,7 @@ export default function CategoryForm({ initialData, mode }: CategoryFormProps) {
           <button
             type="submit"
             disabled={isSaving}
-            className="w-full bg-brand-red hover:bg-brand-red/90 text-white font-extrabold uppercase tracking-widest text-xs py-4 px-6 rounded shadow-lg shadow-brand-red/25 disabled:opacity-50 transition-all duration-300"
+            className="w-full bg-white hover:bg-zinc-200 text-black font-extrabold uppercase tracking-widest text-xs py-4 px-6 rounded shadow-lg shadow-white/5 disabled:opacity-50 transition-all duration-300"
           >
             {isSaving ? 'Saving Category...' : mode === 'create' ? 'Create Category' : 'Save Changes'}
           </button>

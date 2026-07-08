@@ -25,29 +25,35 @@ export default function EditProductPage() {
 
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Use a ref for addToast so it never appears in the useEffect dep array
+  const addToastRef = React.useRef(addToast);
+  React.useEffect(() => { addToastRef.current = addToast; });
 
   useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
     async function loadProduct() {
       try {
         const list = await db.getAllProducts();
+        if (cancelled) return;
         const found = list.find((p) => p.id === id);
         if (found) {
           setProduct(found);
         } else {
-          addToast('Product not found in catalogue', 'error');
+          addToastRef.current('Product not found in catalogue', 'error');
           router.push('/admin/products');
         }
       } catch (error) {
         console.error(error);
-        addToast('Failed to fetch product details', 'error');
+        if (!cancelled) addToastRef.current('Failed to fetch product details', 'error');
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
-    if (id) {
-      loadProduct();
-    }
-  }, [id, router, addToast]);
+    loadProduct();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
   if (isLoading) {
     return (

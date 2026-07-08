@@ -1,5 +1,23 @@
-import { pgTable, uuid, text, integer, boolean, timestamp, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, boolean, timestamp, jsonb, pgEnum } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+
+// 0. Order Status Enum
+export const orderStatusEnum = pgEnum('order_status_enum', [
+  'placed',
+  'confirmed',
+  'packed',
+  'shipped',
+  'delivered',
+  'cancelled',
+  'pending_payment',
+  'payment_verifying',
+  'failed',
+  'expired',
+  'preparing',
+  'ready_for_pickup',
+  'collected',
+  'payment_mismatch'
+]);
 
 // 1. Categories Table
 export const categories = pgTable('categories', {
@@ -38,6 +56,7 @@ export const products = pgTable('products', {
 // 3. Orders Table
 export const orders = pgTable('orders', {
   id: uuid('id').primaryKey().defaultRandom(),
+  user_id: text('user_id'), // Clerk User ID
   order_number: text('order_number').unique().notNull(), // format: DRFTN-1001
   customer_name: text('customer_name').notNull(),
   customer_email: text('customer_email').notNull(),
@@ -48,7 +67,7 @@ export const orders = pgTable('orders', {
     city: string;
     state: string;
     pincode: string;
-  }>().notNull(),
+  }>(), // Nullable for store pickup orders
   items: jsonb('items').$type<Array<{
     id: string; // product ID
     name: string;
@@ -66,10 +85,18 @@ export const orders = pgTable('orders', {
   payment_status: text('payment_status').$type<'pending' | 'paid' | 'failed' | 'refunded'>().notNull().default('pending'),
   razorpay_order_id: text('razorpay_order_id'),
   payment_id: text('razorpay_payment_id'), // Razorpay Payment ID
-  order_status: text('order_status').$type<'placed' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled'>().notNull().default('placed'),
+  order_status: orderStatusEnum('order_status').notNull().default('pending_payment'),
+  fulfillment_type: text('fulfillment_type').$type<'delivery' | 'pickup'>().notNull().default('delivery'),
+  pickup_status: text('pickup_status').$type<'awaiting_pickup' | 'ready_for_pickup' | 'collected'>(),
+  pickup_code: text('pickup_code'),
   tracking_number: text('tracking_number'), // Shiprocket AWB
   courier_partner: text('courier_partner'),
   shiprocket_order_id: text('shiprocket_order_id'),
+  payment_type: text('payment_type').$type<'prepaid' | 'cod_with_deposit'>().notNull().default('prepaid'),
+  deposit_amount: integer('deposit_amount'), // in paise, for COD orders (₹200 = 20000)
+  remaining_amount: integer('remaining_amount'), // in paise, due at delivery (total - deposit_amount)
+  deposit_status: text('deposit_status').$type<'pending' | 'paid' | 'failed'>(),
+  verified_phone: text('verified_phone'), // Phone number verified via phone.email
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -112,4 +139,28 @@ export const productImages = pgTable('product_images', {
   sort_order: integer('sort_order').notNull().default(0),
   alt_text: text('alt_text'),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// 8. Push Subscriptions Table
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  endpoint: text('endpoint').unique().notNull(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  product_id: uuid('product_id').references(() => products.id, { onDelete: 'cascade' }),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  notified_at: timestamp('notified_at', { withTimezone: true }),
+});
+
+// 9. Notification Logs Table
+export const notificationLogs = pgTable('notification_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  url: text('url'),
+  audience_type: text('audience_type').$type<'general' | 'product'>().notNull(),
+  product_id: uuid('product_id').references(() => products.id, { onDelete: 'set null' }),
+  sent_count: integer('sent_count').notNull().default(0),
+  failed_count: integer('failed_count').notNull().default(0),
+  sent_at: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
 });

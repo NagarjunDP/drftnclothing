@@ -12,6 +12,7 @@
     "@clerk/nextjs": "^6.39.5",
     "@imgly/background-removal": "^1.7.0",
     "@neondatabase/serverless": "^1.1.0",
+    "@sentry/nextjs": "^10.64.0",
     "@supabase/supabase-js": "^2.108.2",
     "canvas-confetti": "^1.9.4",
     "drizzle-orm": "^0.45.2",
@@ -24,6 +25,7 @@
     "razorpay": "^2.9.6",
     "react": "^18",
     "react-dom": "^18",
+    "web-push": "^3.6.7",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
@@ -33,6 +35,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/web-push": "^3.6.4",
     "drizzle-kit": "^0.31.10",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",

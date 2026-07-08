@@ -14,18 +14,51 @@ export const createOrderSchema = z.object({
     quantity: z.number().int().min(1).max(10)
   })).min(1).max(20),
   discountCode: z.string().optional(),
+  fulfillmentType: z.enum(['delivery', 'pickup']).default('delivery'),
+  paymentMethod: z.enum(['razorpay', 'cod']).default('razorpay'),
+  verifiedPhone: z.string().optional().nullable(),
+  verifiedPhoneToken: z.string().optional().nullable(),
   customerInfo: z.object({
     name: z.string().trim().min(2).max(100),
     email: z.string().trim().email(),
     phone: z.string().trim().regex(/^[6-9]\d{9}$/, 'Invalid Indian mobile number'),
     address: z.object({
-      line1: z.string().trim().min(1).max(200),
-      line2: z.string().trim().optional(),
-      city: z.string().trim().min(2).max(100),
-      state: z.string().trim().min(2).max(100),
-      pincode: z.string().trim().regex(/^\d{6}$/, 'Must be a 6-digit Indian PIN code')
-    })
+      line1: z.string().trim().max(200).optional().nullable(),
+      line2: z.string().trim().optional().nullable(),
+      city: z.string().trim().max(100).optional().nullable(),
+      state: z.string().trim().max(100).optional().nullable(),
+      pincode: z.string().trim().optional().nullable(),
+    }).optional().nullable()
   })
+}).superRefine((data, ctx) => {
+  if (data.fulfillmentType === 'delivery') {
+    const addr = data.customerInfo.address;
+    if (!addr) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['customerInfo', 'address'], message: 'Shipping address is required for home delivery' });
+      return;
+    }
+    if (!addr.line1 || addr.line1.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['customerInfo', 'address', 'line1'], message: 'Address line 1 is required' });
+    }
+    if (!addr.city || addr.city.trim().length < 2) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['customerInfo', 'address', 'city'], message: 'City is required' });
+    }
+    if (!addr.state || addr.state.trim().length < 2) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['customerInfo', 'address', 'state'], message: 'State is required' });
+    }
+    if (!addr.pincode || !/^\d{6}$/.test(addr.pincode)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['customerInfo', 'address', 'pincode'], message: 'Must be a 6-digit Indian PIN code' });
+    }
+  }
+
+  if (data.paymentMethod === 'cod') {
+    if (!data.verifiedPhone || !/^[6-9]\d{9}$/.test(data.verifiedPhone.replace('+91', '').trim())) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['verifiedPhone'], message: 'Verified phone number is required for Cash on Delivery orders' });
+    }
+    if (!data.verifiedPhoneToken || data.verifiedPhoneToken.trim() === '') {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['verifiedPhoneToken'], message: 'Phone verification token is required for Cash on Delivery orders' });
+    }
+  }
 });
 
 // POST /api/orders/verify-payment Schema
@@ -83,5 +116,17 @@ export const adminProductSchema = z.object({
 
 // Admin Order Status Update Schema
 export const adminUpdateStatusSchema = z.object({
-  status: z.enum(['placed', 'confirmed', 'packed', 'shipped', 'delivered', 'cancelled'])
+  status: z.enum([
+    'placed', 'confirmed', 'packed', 'shipped', 'delivered', 'cancelled',
+    'pending_payment', 'payment_verifying', 'failed', 'expired',
+    'preparing', 'ready_for_pickup', 'collected', 'payment_mismatch'
+  ])
+});
+
+// Admin Push Announcement Schema
+export const adminPushAnnouncementSchema = z.object({
+  title: z.string().trim().min(1, 'Title is required').max(80, 'Title must be under 80 characters'),
+  body: z.string().trim().min(1, 'Body is required').max(200, 'Body must be under 200 characters'),
+  url: z.string().trim().max(500).optional().nullable(),
+  productId: z.string().uuid('Invalid product ID').optional().nullable(),
 });

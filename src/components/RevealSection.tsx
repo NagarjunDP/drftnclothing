@@ -39,7 +39,7 @@ export default function RevealSection() {
         scrollTrigger: {
           trigger: revealSection,
           start: 'top top',
-          end: '+=80%',
+          end: '+=40%',
           scrub: 0.5,
           pin: true,
           pinSpacing: true,

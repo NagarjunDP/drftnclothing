@@ -10,6 +10,7 @@ const MAKE_WHATSAPP_WEBHOOK = process.env.MAKE_WEBHOOK_URL || '';
 
 export async function POST(request: Request) {
   const ip = request.headers.get('x-forwarded-for') || '127.0.0.1';
+  let reqBody: any = null;
 
   try {
     // 0. Verify authentication
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
       );
     }
     const body = await request.json();
+    reqBody = body;
 
     // 1. Zod input validation
     const validationResult = verifyPaymentSchema.safeParse(body);
@@ -64,6 +66,7 @@ export async function POST(request: Request) {
     // 4. Verify Razorpay Signature
     const isMockOrder = razorpay_order_id.startsWith('order_mock_');
     const secret = process.env.RAZORPAY_KEY_SECRET;
+    let paymentAmountVerified = true;
 
     if (!isMockOrder) {
       if (!secret) {
@@ -91,8 +94,43 @@ export async function POST(request: Request) {
         console.warn(`[FRAUD ALERT] Mismatch signature! IP: ${ip}, Order: ${orderId}, Time: ${new Date().toISOString()}`);
         return NextResponse.json({ error: 'Invalid payment signature' }, { status: 400 });
       }
+
+      // Fetch payment from Razorpay API directly to prevent amount tampering
+      try {
+        const { razorpay } = await import('@/lib/razorpay');
+        if (razorpay) {
+          const rzPayment = await razorpay.payments.fetch(razorpay_payment_id);
+          // compare in paise
+          const expectedAmount = order.payment_type === 'cod_with_deposit' ? 20000 : order.total;
+          if (rzPayment.amount !== expectedAmount) {
+            console.error(`[FRAUD ALERT] Razorpay payment amount ${rzPayment.amount} does not match expected total ${expectedAmount}! IP: ${ip}, Order: ${order.order_number}`);
+            paymentAmountVerified = false;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch Razorpay payment entity:', err);
+        return NextResponse.json({ error: 'Failed to verify payment amount with gateway' }, { status: 400 });
+      }
     } else {
       console.log(`Bypassing signature validation for Mock Order: ${razorpay_order_id}`);
+    }
+
+    if (!paymentAmountVerified) {
+      // Flag order as payment_mismatch, do NOT deduct stock
+      await db
+        .update(schema.orders)
+        .set({
+          order_status: 'payment_mismatch',
+          payment_status: 'pending',
+          payment_id: razorpay_payment_id,
+          updated_at: new Date(),
+        })
+        .where(eq(schema.orders.id, orderId));
+
+      return NextResponse.json({ 
+        error: 'Payment amount mismatch detected. Order flagged for manual review.', 
+        code: 'PAYMENT_MISMATCH' 
+      }, { status: 400 });
     }
 
     // 5. Update order state and deduct stock inside a secure SQL transaction
@@ -113,7 +151,8 @@ export async function POST(request: Request) {
         const [pRecord] = await tx
           .select({ stock_quantity: schema.products.stock_quantity })
           .from(schema.products)
-          .where(eq(schema.products.id, item.id));
+          .where(eq(schema.products.id, item.id))
+          .for('update');
 
         if (pRecord) {
           const currentStock = { ...pRecord.stock_quantity };
@@ -135,15 +174,20 @@ export async function POST(request: Request) {
           .where(eq(schema.discountCodes.code, oRecord.discount_code));
       }
 
-      // Update Order Status to paid and placed
+      // Update Order Status to paid and confirmed (state machine)
+      const updates: any = {
+        payment_status: 'paid',
+        payment_id: razorpay_payment_id,
+        order_status: 'confirmed',
+        updated_at: new Date(),
+      };
+      if (oRecord.payment_type === 'cod_with_deposit') {
+        updates.deposit_status = 'paid';
+      }
+
       const [updatedOrder] = await tx
         .update(schema.orders)
-        .set({
-          payment_status: 'paid',
-          payment_id: razorpay_payment_id,
-          order_status: 'placed',
-          updated_at: new Date(),
-        })
+        .set(updates)
         .where(eq(schema.orders.id, orderId))
         .returning();
 
@@ -179,8 +223,16 @@ export async function POST(request: Request) {
       orderNumber: confirmedOrder.order_number,
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Server error during payment verification:', error);
+    try {
+      const { captureException, setTag } = await import('@sentry/nextjs');
+      setTag("order_id", reqBody?.orderId || 'unknown');
+      setTag("payment_id", reqBody?.razorpay_payment_id || 'unknown');
+      captureException(error);
+    } catch (sentryErr) {
+      console.error('Sentry reporting failed:', sentryErr);
+    }
     return NextResponse.json({ error: 'An unexpected verification error occurred' }, { status: 500 });
   }
 }

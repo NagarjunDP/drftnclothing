@@ -209,7 +209,7 @@ export default function PolicyPage({ params }: { params: { slug: string } }) {
       {/* Header Panel */}
       <div className="border border-zinc-800 bg-zinc-900/10 p-6 md:p-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-12">
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-brand-red">
+          <div className="flex items-center gap-2 text-white">
             <IconComponent className="w-5 h-5" />
             <span className="text-[10px] tracking-[0.25em] uppercase font-bold font-mono">DRFTN Legal</span>
           </div>
@@ -218,7 +218,7 @@ export default function PolicyPage({ params }: { params: { slug: string } }) {
           </h1>
           <p className="text-[10px] text-zinc-500 font-mono">LAST UPDATED: {policy.lastUpdated}</p>
         </div>
-        <div className="bg-brand-red/10 border border-brand-red/20 px-4 py-2 rounded text-[10px] font-bold text-brand-red uppercase tracking-wider">
+        <div className="bg-white/10 border border-white/20 px-4 py-2 rounded text-[10px] font-bold text-white uppercase tracking-wider">
           Official Store Policy
         </div>
       </div>

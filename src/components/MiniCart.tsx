@@ -353,7 +353,7 @@ export default function MiniCart() {
               <Link
                 href="/checkout"
                 onClick={() => setIsOpen(false)}
-                className="btn-electric relative overflow-hidden bg-brand-offwhite text-brand-black text-center py-3.5 text-[10px] tracking-widest font-bold uppercase border border-transparent hover:bg-brand-red hover:text-brand-offwhite transition-all duration-300"
+                className="btn-electric relative overflow-hidden bg-brand-offwhite text-brand-black text-center py-3.5 text-[10px] tracking-widest font-bold uppercase border border-transparent hover:bg-white transition-all duration-300"
               >
                 Checkout
               </Link>

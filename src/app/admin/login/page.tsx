@@ -57,7 +57,7 @@ function AdminLoginContent() {
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
           <h1 className="text-3xl font-extrabold tracking-[0.2em] text-brand-offwhite uppercase mb-2">
-            D R F T N <span className="text-brand-red font-light text-sm align-top">ADMIN</span>
+            D R F T N <span className="text-white font-light text-sm align-top">ADMIN</span>
           </h1>
           <p className="text-zinc-500 text-xs tracking-widest uppercase">Authorized Personnel Only</p>
         </div>
@@ -65,7 +65,7 @@ function AdminLoginContent() {
         <div className="bg-zinc-900/40 border border-zinc-800 p-8 rounded-none">
           <form onSubmit={handleLogin} className="space-y-6">
             {unauthorizedError && (
-              <div className="bg-red-900/20 border border-red-900/50 p-4 text-xs text-brand-red flex items-start gap-2.5">
+              <div className="bg-zinc-950 border border-zinc-800 p-4 text-xs text-white flex items-start gap-2.5">
                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <div>
                   <span className="font-bold uppercase tracking-wider block mb-1">Access Denied</span>
@@ -75,7 +75,7 @@ function AdminLoginContent() {
             )}
 
             {errorMsg && (
-              <div className="bg-red-900/20 border border-red-900/50 p-4 text-xs text-brand-red flex items-start gap-2.5 animate-shake">
+              <div className="bg-zinc-950 border border-zinc-800 p-4 text-xs text-white flex items-start gap-2.5 animate-shake">
                 <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
                 <div>
                   <span className="font-bold uppercase tracking-wider block mb-1">Login Error</span>
@@ -109,7 +109,7 @@ function AdminLoginContent() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-zinc-900/80 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors"
+                className="w-full bg-zinc-900/80 border border-zinc-800 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-white transition-colors"
                 placeholder="••••••••"
               />
             </div>
@@ -117,7 +117,7 @@ function AdminLoginContent() {
             <button
               type="submit"
               disabled={isLoading || !isLoaded}
-              className="w-full bg-brand-red text-white py-4 font-bold uppercase tracking-widest text-sm hover:bg-red-600 transition-colors disabled:opacity-50 mt-2"
+              className="w-full bg-white text-black py-4 font-bold uppercase tracking-widest text-sm hover:bg-zinc-200 transition-colors disabled:opacity-50 mt-2"
             >
               {isLoading ? 'Authenticating...' : 'Sign In'}
             </button>

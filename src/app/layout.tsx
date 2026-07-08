@@ -8,6 +8,7 @@ import WhatsAppButton from '@/components/WhatsAppButton';
 import ToastContainer from '@/components/ToastContainer';
 import AddToCartAnimation from '@/components/AddToCartAnimation';
 import BrandLoader from '@/components/BrandLoader';
+import PushPrompt from '@/components/PushPrompt';
 import { ClerkProvider } from '@clerk/nextjs';
 
 export const metadata: Metadata = {
@@ -183,6 +184,7 @@ export default function RootLayout({
           <ToastContainer />
           <AddToCartAnimation />
           <BrandLoader />
+          <PushPrompt />
         </body>
       </html>
     </ClerkProvider>

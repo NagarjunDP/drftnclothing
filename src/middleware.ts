@@ -59,6 +59,12 @@ export default clerkMiddleware(async (auth, request) => {
       limit = 5;
     } else if (pathname.startsWith('/api/orders/create') || pathname.startsWith('/api/orders/verify-payment')) {
       limit = 10;
+    } else if (pathname.startsWith('/api/admin/push/announce-')) {
+      limit = 5;
+      windowMs = 300000; // 5 minutes
+    } else if (pathname === '/api/push/subscribe' || pathname === '/api/push/unsubscribe') {
+      limit = 10;
+      windowMs = 60000; // 1 minute
     }
 
     const rateLimitResult = await rateLimit(`ratelimit:${ip}:${pathname}`, limit, windowMs);

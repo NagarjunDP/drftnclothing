@@ -403,6 +403,11 @@ export const dbService = {
       
       const { images, ...productFields } = updates;
 
+      const [oldProduct] = await db
+        .select()
+        .from(schema.products)
+        .where(eq(schema.products.id, id));
+
       const [updated] = await db
         .update(schema.products)
         .set({
@@ -413,6 +418,54 @@ export const dbService = {
         .returning();
 
       if (!updated) throw new Error('Product not found');
+
+      // Check if stock went from 0 to >0
+      if (oldProduct && updates.stock_quantity) {
+        const oldTotalStock = Object.values(oldProduct.stock_quantity as Record<string, number>).reduce((a, b) => a + b, 0);
+        const newTotalStock = Object.values(updated.stock_quantity as Record<string, number>).reduce((a, b) => a + b, 0);
+        
+        if (oldTotalStock === 0 && newTotalStock > 0) {
+          try {
+            const { pushSubscriptions } = await import('@/db/schema');
+            const { isNull, and } = await import('drizzle-orm');
+            const { sendPushNotification } = await import('@/lib/push');
+
+            const subscribers = await db
+              .select()
+              .from(pushSubscriptions)
+              .where(
+                and(
+                  eq(pushSubscriptions.product_id, id),
+                  isNull(pushSubscriptions.notified_at)
+                )
+              );
+            
+            if (subscribers.length > 0) {
+              const payload = {
+                title: 'Back in Stock!',
+                body: `${updated.name} is now back in stock. Grab yours before it's gone again.`,
+                url: `/shop/${updated.slug}`,
+              };
+              
+              await Promise.allSettled(
+                subscribers.map((sub: any) => sendPushNotification(sub, payload))
+              );
+              
+              await db
+                .update(pushSubscriptions)
+                .set({ notified_at: new Date() })
+                .where(
+                  and(
+                    eq(pushSubscriptions.product_id, id),
+                    isNull(pushSubscriptions.notified_at)
+                  )
+                );
+            }
+          } catch (e) {
+            console.error('Failed to process restock notifications:', e);
+          }
+        }
+      }
 
       if (images !== undefined) {
         await db.delete(schema.productImages).where(eq(schema.productImages.product_id, id));
@@ -513,8 +566,16 @@ export const dbService = {
         payment_status: r.payment_status === 'refunded' ? 'failed' : r.payment_status,
         payment_id: r.payment_id || undefined,
         order_status: r.order_status,
+        fulfillment_type: r.fulfillment_type || 'delivery',
+        pickup_status: r.pickup_status || null,
+        pickup_code: r.pickup_code || null,
         tracking_number: r.tracking_number || undefined,
         courier_partner: r.courier_partner || undefined,
+        payment_type: r.payment_type || 'prepaid',
+        deposit_amount: r.deposit_amount || null,
+        remaining_amount: r.remaining_amount || null,
+        deposit_status: r.deposit_status || null,
+        verified_phone: r.verified_phone || null,
         created_at: r.created_at.toISOString(),
       }));
     } else {
@@ -553,8 +614,16 @@ export const dbService = {
         payment_status: r.payment_status === 'refunded' ? 'failed' : r.payment_status,
         payment_id: r.payment_id || undefined,
         order_status: r.order_status,
+        fulfillment_type: r.fulfillment_type || 'delivery',
+        pickup_status: r.pickup_status || null,
+        pickup_code: r.pickup_code || null,
         tracking_number: r.tracking_number || undefined,
         courier_partner: r.courier_partner || undefined,
+        payment_type: r.payment_type || 'prepaid',
+        deposit_amount: r.deposit_amount || null,
+        remaining_amount: r.remaining_amount || null,
+        deposit_status: r.deposit_status || null,
+        verified_phone: r.verified_phone || null,
         created_at: r.created_at.toISOString(),
       };
     } else {
@@ -603,6 +672,11 @@ export const dbService = {
         order_status: found.order_status,
         tracking_number: found.tracking_number || undefined,
         courier_partner: found.courier_partner || undefined,
+        payment_type: found.payment_type || 'prepaid',
+        deposit_amount: found.deposit_amount || null,
+        remaining_amount: found.remaining_amount || null,
+        deposit_status: found.deposit_status || null,
+        verified_phone: found.verified_phone || null,
         created_at: found.created_at.toISOString(),
       };
     } else {
@@ -620,9 +694,10 @@ export const dbService = {
         customer_phone: contact,
         shipping_address: { line1: '', city: '', state: '', pincode: '' },
         items: data.items,
-        subtotal: 0,
-        shipping_charge: 0,
-        total: 0,
+        subtotal: data.subtotal || 0,
+        shipping_charge: data.shipping_charge || 0,
+        total: data.total || 0,
+        discount_amount: data.discount_amount || 0,
         payment_status: 'paid',
         order_status: data.order_status,
         tracking_number: data.tracking_number,
@@ -730,6 +805,7 @@ export const dbService = {
       payment_status?: Order['payment_status'];
       tracking_number?: string;
       courier_partner?: string;
+      pickup_status?: Order['pickup_status'];
     }
   ): Promise<Order> {
     if (typeof window === 'undefined') {
@@ -744,6 +820,7 @@ export const dbService = {
           payment_status: updates.payment_status as any,
           tracking_number: updates.tracking_number,
           courier_partner: updates.courier_partner,
+          pickup_status: updates.pickup_status as any,
           updated_at: new Date(),
         })
         .where(eq(schema.orders.id, id))
@@ -765,6 +842,9 @@ export const dbService = {
         payment_status: updated.payment_status === 'refunded' ? 'failed' : updated.payment_status,
         payment_id: updated.payment_id || undefined,
         order_status: updated.order_status,
+        fulfillment_type: updated.fulfillment_type || 'delivery',
+        pickup_status: updated.pickup_status || null,
+        pickup_code: updated.pickup_code || null,
         tracking_number: updated.tracking_number || undefined,
         courier_partner: updated.courier_partner || undefined,
         created_at: updated.created_at.toISOString(),

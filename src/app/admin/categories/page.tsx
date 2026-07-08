@@ -202,7 +202,7 @@ export default function AdminCategories() {
         </div>
         <button
           onClick={() => router.push('/admin/categories/new')}
-          className="bg-brand-red text-white px-6 py-3 font-bold uppercase tracking-widest text-xs hover:bg-red-600 transition-colors flex items-center gap-2"
+          className="bg-white hover:bg-zinc-200 text-black px-6 py-3 font-bold uppercase tracking-widest text-xs transition-colors flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           Add Category

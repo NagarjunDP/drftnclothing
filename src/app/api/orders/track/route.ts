@@ -45,12 +45,13 @@ export async function GET(request: Request) {
       );
     }
 
-    // 3. Strip sensitive fields (totals, full addresses) for client response
+    // 3. Keep safe fields for client response, including totals and prices
     const sanitizedItems = order.items.map((item: any) => ({
       name: item.name,
       size: item.size,
       quantity: item.quantity,
       image: item.image || '',
+      price: item.price,
     }));
 
     // Estimate delivery duration based on PIN code locally
@@ -64,6 +65,10 @@ export async function GET(request: Request) {
       order_status: order.order_status,
       created_at: order.created_at.toISOString(),
       items: sanitizedItems,
+      total: order.total,
+      subtotal: order.subtotal,
+      shipping_charge: order.shipping_charge,
+      discount_amount: order.discount_amount || 0,
       tracking_number: order.tracking_number || null,
       courier_partner: order.courier_partner || null,
       estimated_delivery_text: estDaysText,

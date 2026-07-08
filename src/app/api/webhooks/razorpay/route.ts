@@ -22,10 +22,15 @@ export async function POST(request: Request) {
       .update(rawBody)
       .digest('hex');
 
-    const isValid = crypto.timingSafeEqual(
-      Buffer.from(expectedSignature, 'utf-8'),
-      Buffer.from(signature, 'utf-8')
-    );
+    const expectedBuf = Buffer.from(expectedSignature, 'utf-8');
+    const sigBuf = Buffer.from(signature, 'utf-8');
+
+    if (expectedBuf.length !== sigBuf.length) {
+      console.warn('[Razorpay Webhook] Invalid webhook signature length!');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+    }
+
+    const isValid = crypto.timingSafeEqual(expectedBuf, sigBuf);
 
     if (!isValid) {
       console.warn('[Razorpay Webhook] Invalid webhook signature detected!');
@@ -56,7 +61,26 @@ export async function POST(request: Request) {
     // Handle Captured Payment
     if (event === 'payment.captured') {
       if (order.payment_status === 'paid') {
-        return NextResponse.json({ success: true, message: 'Order already completed' });
+        return NextResponse.json({ success: true, message: 'Order already completed (idempotency check passed)' });
+      }
+
+      // Verify payment amount matches expected amount (Razorpay payment.amount is in paise)
+      const amountReceived = payment.amount;
+      const expectedAmount = order.payment_type === 'cod_with_deposit' ? 20000 : order.total;
+      if (amountReceived !== expectedAmount) {
+        console.error(`[FRAUD ALERT] Webhook payment amount ${amountReceived} does not match expected total ${expectedAmount}! Order: ${order.order_number}`);
+        
+        await db
+          .update(schema.orders)
+          .set({
+            order_status: 'payment_mismatch',
+            payment_status: 'pending',
+            payment_id: payment.id,
+            updated_at: new Date(),
+          })
+          .where(eq(schema.orders.id, order.id));
+
+        return NextResponse.json({ success: true, message: 'Payment mismatch handled, order flagged.' });
       }
 
       await db.transaction(async (tx: any) => {
@@ -73,7 +97,8 @@ export async function POST(request: Request) {
           const [pRecord] = await tx
             .select({ stock_quantity: schema.products.stock_quantity })
             .from(schema.products)
-            .where(eq(schema.products.id, item.id));
+            .where(eq(schema.products.id, item.id))
+            .for('update');
 
           if (pRecord) {
             const currentStock = { ...pRecord.stock_quantity };
@@ -95,15 +120,20 @@ export async function POST(request: Request) {
             .where(eq(schema.discountCodes.code, oRecord.discount_code));
         }
 
-        // Mark as paid
+        // Mark as paid and confirmed
+        const updates: any = {
+          payment_status: 'paid',
+          payment_id: payment.id,
+          order_status: 'confirmed',
+          updated_at: new Date(),
+        };
+        if (oRecord.payment_type === 'cod_with_deposit') {
+          updates.deposit_status = 'paid';
+        }
+
         await tx
           .update(schema.orders)
-          .set({
-            payment_status: 'paid',
-            payment_id: payment.id,
-            order_status: 'placed',
-            updated_at: new Date(),
-          })
+          .set(updates)
           .where(eq(schema.orders.id, order.id));
       });
 

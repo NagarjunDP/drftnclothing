@@ -14,6 +14,7 @@ import RevealSection from '@/components/RevealSection';
 import AnnouncementTicker from '@/components/AnnouncementTicker';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { motion } from 'framer-motion';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -23,11 +24,13 @@ gsap.registerPlugin(ScrollTrigger);
 function ProductCard({
   prod,
   onQuickAdd,
-  aspectClass = 'aspect-[3/4]'
+  aspectClass = 'aspect-[4/5]',
+  showActions = false
 }: {
   prod: Product;
   onQuickAdd: (e: React.MouseEvent, p: Product) => void;
   aspectClass?: string;
+  showActions?: boolean;
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
@@ -50,91 +53,120 @@ function ProductCard({
   };
 
   return (
-    <Link
-      href={`/shop/${prod.slug}`}
-      className="group flex flex-col bg-transparent text-left w-full relative"
-      aria-label={`View ${prod.name} — ₹${(prod.price / 100).toLocaleString('en-IN')}`}
-      style={{ transform: 'translate3d(0,0,0)', willChange: 'transform' }}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-10%' }}
+      transition={{ duration: 0.4, ease: 'easeOut' }}
+      className="w-full"
     >
-      {/* Image Container */}
-      <div className={`relative overflow-hidden rounded-[var(--radius-lg)] bg-brand-charcoal ${aspectClass} w-full`}>
-        <Image
-          src={prod.images[0] || 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800'}
-          alt={prod.name}
-          fill
-          sizes="(max-width: 768px) 85vw, 40vw"
-          loading="lazy"
-          className="object-cover transition-transform duration-[750ms] ease-out group-hover:scale-[1.03]"
-        />
-
-        {/* Sold Out Badge */}
-        {isOutOfStock && (
-          <div className="absolute top-3.5 left-3.5 z-20 bg-black/85 backdrop-blur-md px-3 py-1 rounded-[var(--radius-sm)] border border-white/10">
-            <span className="text-brand-red text-[8px] font-extrabold tracking-[0.25em] uppercase">
-              SOLD OUT
-            </span>
-          </div>
-        )}
-
-        {/* Wishlist Heart Icon (Top-Right) */}
-        <button
-          onClick={handleWishlistClick}
-          className="absolute top-3.5 right-3.5 z-20 w-8 h-8 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/10 hover:bg-black/80 transition-colors"
-          aria-label="Add to wishlist"
+      <Link
+        href={`/shop/${prod.slug}`}
+        className="group flex flex-col bg-transparent text-left w-full relative"
+        aria-label={`View ${prod.name} — ₹${(prod.price / 100).toLocaleString('en-IN')}`}
+      >
+        <motion.div
+          whileTap={{ scale: 0.97, filter: 'brightness(1.08)' }}
+          transition={{ duration: 0.15 }}
+          className="flex flex-col w-full text-left"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill={isWishlisted ? 'var(--color-red)' : 'none'}
-            stroke={isWishlisted ? 'var(--color-red)' : 'currentColor'}
-            strokeWidth="1.5"
-            className="w-4 h-4 text-white"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
-          </svg>
-        </button>
+          {/* Image Container */}
+          <div className={`relative overflow-hidden rounded-xl bg-brand-charcoal ${aspectClass} w-full border border-white/[0.08] shadow-[0_12px_40px_rgba(0,0,0,0.5)]`}>
+            <Image
+              src={prod.images[0] || 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800'}
+              alt={prod.name}
+              fill
+              sizes="(max-width: 768px) 85vw, 40vw"
+              loading="lazy"
+              className="object-cover transition-transform duration-[750ms] ease-out group-hover:scale-[1.01]"
+            />
+            {/* Subtle bottom dark gradient */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent pointer-events-none" />
 
-        {/* Quick Add Plus Button (Bottom-Right) */}
-        {!isOutOfStock && (
-          <div className="absolute bottom-3.5 right-3.5 z-10">
-            <button
-              onClick={handleQuickAddClick}
-              disabled={isAdding}
-              className={`w-9 h-9 rounded-full flex items-center justify-center shadow-md transition-all duration-200 active:scale-90 ${
-                isAdding
-                  ? 'bg-brand-red text-white border border-brand-red'
-                  : 'bg-black/60 hover:bg-black/80 text-white border border-white/10'
-              }`}
-              id={`quick-add-${prod.id}`}
-              aria-label={`Quick add ${prod.name} to cart`}
-            >
-              {isAdding ? (
-                <span className="text-xs font-bold font-mono">✓</span>
-              ) : (
-                <Plus className="w-4 h-4" />
-              )}
-            </button>
+            {/* Refined Minimal Outlined Badges */}
+            {isOutOfStock ? (
+              <div className="absolute top-3.5 left-3.5 z-20 border border-white/10 text-white/50 bg-black/40 px-2 py-0.5 rounded-full backdrop-blur-[2px]">
+                <span className="text-[9px] font-mono font-bold tracking-widest uppercase">
+                  SOLD OUT
+                </span>
+              </div>
+            ) : prod.is_featured ? (
+              <div className="absolute top-3.5 left-3.5 z-20 border border-white/20 text-white/95 bg-black/40 px-2 py-0.5 rounded-full backdrop-blur-[2px]">
+                <span className="text-[9px] font-mono font-bold tracking-widest uppercase">
+                  NEW DROP
+                </span>
+              </div>
+            ) : null}
+
+            {/* Actions */}
+            {showActions && (
+              <>
+                <button
+                  onClick={handleWishlistClick}
+                  className="absolute top-3.5 right-3.5 z-20 w-8 h-8 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center border border-white/10 hover:bg-black/80 transition-colors"
+                  aria-label="Add to wishlist"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill={isWishlisted ? '#FFFFFF' : 'none'}
+                    stroke={isWishlisted ? '#FFFFFF' : 'currentColor'}
+                    strokeWidth="1.5"
+                    className="w-4 h-4 text-white"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+                  </svg>
+                </button>
+
+                {!isOutOfStock && (
+                  <div className="absolute bottom-3.5 right-3.5 z-10">
+                    <button
+                      onClick={handleQuickAddClick}
+                      disabled={isAdding}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center shadow-md transition-all duration-200 active:scale-90 ${
+                        isAdding
+                          ? 'bg-white text-black border border-white'
+                          : 'bg-black/60 hover:bg-black/80 text-white border border-white/10'
+                      }`}
+                      id={`quick-add-${prod.id}`}
+                      aria-label={`Quick add ${prod.name} to cart`}
+                    >
+                      {isAdding ? (
+                        <span className="text-xs font-bold font-mono">✓</span>
+                      ) : (
+                        <Plus className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Product Details */}
-      <div className="pt-3 pb-1 flex flex-col text-left space-y-1">
-        <h3 className="text-xs font-bold text-white tracking-[0.06em] uppercase line-clamp-1 font-body">
-          {prod.name}
-        </h3>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-brand-red font-body">
-            ₹{(prod.price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
-          </span>
-          {prod.compare_price && prod.compare_price > prod.price && (
-            <span className="text-[10px] text-brand-stone line-through font-body">
-              ₹{(prod.compare_price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
-            </span>
-          )}
-        </div>
-      </div>
-    </Link>
+          {/* Product Details (Unified rhythm) */}
+          <div className="pt-3 pb-1 flex flex-col text-left space-y-1">
+            <h3 className="text-xs font-semibold text-white tracking-[0.06em] uppercase line-clamp-1 font-body">
+              {prod.name}
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-white font-body">
+                ₹{(prod.price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+              </span>
+              {prod.compare_price && prod.compare_price > prod.price && (
+                <>
+                  <span className="text-[10px] text-white/40 line-through font-body">
+                    ₹{(prod.compare_price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                  </span>
+                  <span className="text-[10px] font-mono text-white/50 tracking-wider">
+                    -{Math.round(((prod.compare_price - prod.price) / prod.compare_price) * 100)}%
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+    </motion.div>
   );
 }
 
@@ -174,45 +206,8 @@ export default function Homepage() {
     if (loading) return;
 
     const ctx = gsap.context(() => {
-      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-      if (prefersReducedMotion) {
-        // Reduced motion: standard fast reveals
-        gsap.set('.category-checkpoint-reveal, .story-checkpoint-reveal', { opacity: 1, x: 0, y: 0 });
-        return;
-      }
-
-      // Categories reveal (Slide and settle)
-      gsap.fromTo('.category-checkpoint-reveal',
-        { opacity: 0, x: -40 },
-        {
-          opacity: 1,
-          x: 0,
-          duration: 0.85,
-          ease: 'power2.out',
-          scrollTrigger: {
-            trigger: '#categories-heading',
-            start: 'top 85%',
-            toggleActions: 'play none none none',
-          }
-        }
-      );
-
-      // Story reveal
-      gsap.fromTo('.story-checkpoint-reveal',
-        { opacity: 0, x: 40 },
-        {
-          opacity: 1,
-          x: 0,
-          duration: 0.85,
-          ease: 'power2.out',
-          scrollTrigger: {
-            trigger: '#story-heading',
-            start: 'top 85%',
-            toggleActions: 'play none none none',
-          }
-        }
-      );
+      // reveals now handled natively by Framer Motion
+      return;
     });
 
     ScrollTrigger.refresh();
@@ -282,12 +277,32 @@ export default function Homepage() {
           ═══════════════════════════════════════════ */}
       <section
         ref={categoryRef}
-        className="pt-12 pb-24 md:pt-16 md:pb-36 w-full overflow-hidden text-brand-offwhite relative z-10"
+        className="pt-12 pb-16 md:pt-16 md:pb-20 w-full overflow-hidden text-brand-offwhite relative z-10"
         aria-labelledby="categories-heading"
       >
 
         {/* Header */}
-        <div className="category-checkpoint-reveal opacity-0 flex items-end justify-between mb-16 px-6 md:px-12 max-w-screen-2xl mx-auto w-full animate-telemetry-hud">
+        <motion.div
+          initial={{ opacity: 0.3, filter: 'blur(4px)', y: 16 }}
+          whileInView={{
+            opacity: 1,
+            filter: 'blur(0px)',
+            y: 0,
+            textShadow: [
+              '0 0 0px rgba(255,255,255,0)',
+              '0 0 15px rgba(255,255,255,0.4)',
+              '0 0 0px rgba(255,255,255,0)',
+            ],
+          }}
+          viewport={{ once: true, margin: '-20%' }}
+          transition={{
+            opacity: { type: 'spring', stiffness: 100, damping: 15 },
+            y: { type: 'spring', stiffness: 100, damping: 15 },
+            filter: { duration: 0.5 },
+            textShadow: { duration: 0.4, delay: 0.35 }
+          }}
+          className="flex items-end justify-between mb-16 px-6 md:px-12 max-w-screen-2xl mx-auto w-full animate-telemetry-hud"
+        >
           <div className="relative pl-6 py-2 text-left">
             {/* Corner Brackets */}
             <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t border-l border-white/20" />
@@ -318,64 +333,27 @@ export default function Homepage() {
               <span className="w-1.5 h-1.5 bg-zinc-800 rounded-[1px]" />
             </div>
           </Link>
-        </div>
+        </motion.div>
 
         {/* Product Cards Grid (Rebuilt as a clean, image-forward product grid) */}
         {featuredProducts.length > 0 ? (
-          <div className="category-checkpoint-reveal opacity-0 w-full">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 px-4 md:px-12 max-w-screen-2xl mx-auto w-full">
-              {featuredProducts.slice(0, 4).map((prod) => {
-                const isOutOfStock = prod.sizes.every((s) => (prod.stock_quantity[s] || 0) === 0);
-                const isNew = prod.is_featured;
-
-                return (
-                  <Link
-                    key={prod.id}
-                    href={`/shop/${prod.slug}`}
-                    className="group relative w-full flex flex-col text-left"
-                    aria-label={`Shop ${prod.name}`}
-                  >
-                    {/* Image Box */}
-                    <div className="relative w-full aspect-[3/4] overflow-hidden bg-[#121212] rounded-[8px] border border-white/5 shadow-[0_12px_40px_rgba(0,0,0,0.5)]">
-                      <Image
-                        src={prod.images[0] || 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800'}
-                        alt={prod.name}
-                        fill
-                        sizes="(max-width: 768px) 50vw, 25vw"
-                        loading="lazy"
-                        className="object-cover transition-transform duration-700 ease-luxury group-hover:scale-[1.02]"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-
-                      {/* Tag Badge in top-right corner */}
-                      <div className="absolute top-3 right-3 z-10">
-                        <span className="font-mono text-[9px] tracking-widest font-bold uppercase px-2 py-0.5 rounded bg-black/80 text-white border border-white/15">
-                          {isOutOfStock ? 'SOLD OUT' : isNew ? 'NEW DROP' : 'LIMITED'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Metadata Details below card */}
-                    <div className="pt-4 pb-2 flex flex-col space-y-1">
-                      <h3 className="text-xs md:text-sm font-bold text-white tracking-[0.06em] uppercase font-display leading-tight">
-                        {prod.name}
-                      </h3>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs md:text-sm font-semibold text-brand-stone font-body">
-                          ₹{(prod.price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
-                        </span>
-                        {prod.compare_price && prod.compare_price > prod.price && (
-                          <span className="text-[10px] text-zinc-600 line-through font-body">
-                            ₹{(prod.compare_price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-10%' }}
+            transition={{ duration: 0.6 }}
+            className="w-full"
+          >
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-[8px] md:gap-6 px-4 md:px-12 max-w-screen-2xl mx-auto w-full">
+              {featuredProducts.slice(0, 4).map((prod) => (
+                <ProductCard
+                  key={prod.id}
+                  prod={prod}
+                  onQuickAdd={handleQuickAdd}
+                />
+              ))}
             </div>
-          </div>
+          </motion.div>
         ) : (
           <div className="max-w-screen-2xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 px-4 md:px-12" aria-busy="true" aria-label="Loading collections">
             {[...Array(4)].map((_, i) => (
@@ -393,12 +371,32 @@ export default function Homepage() {
           ═══════════════════════════════════════════ */}
       <section
         ref={storyRef}
-        className="py-24 md:py-36 px-6 md:px-12 max-w-screen-2xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-center relative z-10"
+        className="py-16 md:py-24 px-6 md:px-12 max-w-screen-2xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24 items-center relative z-10"
         aria-labelledby="story-heading"
       >
 
         {/* Text */}
-        <div className="story-checkpoint-reveal opacity-0 space-y-8 border-l-2 border-white/10 pl-6 lg:pl-10">
+        <motion.div
+          initial={{ opacity: 0.3, filter: 'blur(4px)', y: 16 }}
+          whileInView={{
+            opacity: 1,
+            filter: 'blur(0px)',
+            y: 0,
+            textShadow: [
+              '0 0 0px rgba(255,255,255,0)',
+              '0 0 15px rgba(255,255,255,0.4)',
+              '0 0 0px rgba(255,255,255,0)',
+            ],
+          }}
+          viewport={{ once: true, margin: '-20%' }}
+          transition={{
+            opacity: { type: 'spring', stiffness: 100, damping: 15 },
+            y: { type: 'spring', stiffness: 100, damping: 15 },
+            filter: { duration: 0.5 },
+            textShadow: { duration: 0.4, delay: 0.35 }
+          }}
+          className="space-y-8 border-l-2 border-white/10 pl-6 lg:pl-10"
+        >
           <div className="relative pl-6 py-2 text-left">
             {/* Corner Brackets */}
             <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t border-l border-white/20" />
@@ -445,16 +443,22 @@ export default function Homepage() {
               { label: 'D2C', note: 'Direct' },
             ].map((val) => (
               <div key={val.label} className="space-y-1 text-left">
-                <span className="block w-4 h-[2px] bg-brand-red mb-2" aria-hidden="true" />
+                <span className="block w-4 h-[2px] bg-white/60 mb-2" aria-hidden="true" />
                 <p className="text-[10px] tracking-[0.15em] text-white uppercase font-body font-bold">{val.label}</p>
                 <p className="text-[9px] tracking-wider text-brand-stone uppercase font-body">{val.note}</p>
               </div>
             ))}
           </div>
-        </div>
+        </motion.div>
 
         {/* Images Collage */}
-        <div className="story-checkpoint-reveal opacity-0 grid grid-cols-2 gap-3.5 h-[420px] md:h-[520px]">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-10%' }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
+          className="grid grid-cols-2 gap-3.5 h-[420px] md:h-[520px]"
+        >
           <div className="overflow-hidden relative h-full rounded-[var(--radius-lg)] bg-brand-charcoal border border-white/5">
             <Image
               src="https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=600&auto=format&fit=crop&q=85"
@@ -475,11 +479,11 @@ export default function Homepage() {
               className="object-cover hover:scale-103 transition-transform duration-700 grayscale hover:grayscale-0"
             />
           </div>
-        </div>
+        </motion.div>
       </section>
 
       {/* ── Promo Banner Strip ── */}
-      <section className="w-full bg-brand-red py-5 px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-4 relative z-10 border-y border-white/5">
+      <section className="w-full bg-white py-5 px-6 md:px-12 flex flex-col md:flex-row items-center justify-between gap-4 relative z-10 border-y border-white/5">
         <p className="text-black font-display font-black text-sm md:text-base tracking-[0.08em] uppercase text-center md:text-left">
           LIMITED RUN: HEAVYWEIGHT ACID-WASH OVERSIZED SILHOUETTES OUT NOW
         </p>
@@ -512,7 +516,7 @@ export default function Homepage() {
           <div className="absolute inset-0 bg-brand-black/80" aria-hidden="true" />
           <div className="relative z-10 h-full flex items-center justify-center text-center px-6">
             <div className="space-y-4 max-w-3xl">
-              <p className="text-brand-red text-[10px] tracking-[0.45em] uppercase font-body font-bold">
+              <p className="text-white/60 text-[10px] tracking-[0.45em] uppercase font-body font-bold">
                 Our Material Promise
               </p>
               <blockquote className="text-white font-display uppercase tracking-wider leading-tight" style={{ fontSize: 'clamp(1.4rem, 3.5vw, 2.6rem)' }}>
@@ -531,13 +535,33 @@ export default function Homepage() {
           ═══════════════════════════════════════════ */}
       <section
         ref={igRef}
-        className="py-24 md:py-36 px-6 md:px-12 w-full relative z-10 border-t border-brand-graphite/40"
+        className="py-16 md:py-24 px-6 md:px-12 w-full relative z-10 border-t border-brand-graphite/40"
         aria-labelledby="lookbook-heading"
       >
         <div className="max-w-screen-2xl mx-auto">
           {/* Header */}
-          <div className="text-center mb-14 space-y-3">
-            <span className="block w-6 h-[2px] bg-brand-red mx-auto mb-3" aria-hidden="true" />
+          <motion.div
+            initial={{ opacity: 0.3, filter: 'blur(4px)', y: 16 }}
+            whileInView={{
+              opacity: 1,
+              filter: 'blur(0px)',
+              y: 0,
+              textShadow: [
+                '0 0 0px rgba(255,255,255,0)',
+                '0 0 15px rgba(255,255,255,0.4)',
+                '0 0 0px rgba(255,255,255,0)',
+              ],
+            }}
+            viewport={{ once: true, margin: '-20%' }}
+            transition={{
+              opacity: { type: 'spring', stiffness: 100, damping: 15 },
+              y: { type: 'spring', stiffness: 100, damping: 15 },
+              filter: { duration: 0.5 },
+              textShadow: { duration: 0.4, delay: 0.35 }
+            }}
+            className="text-center mb-14 space-y-3"
+          >
+            <span className="block w-6 h-[2px] bg-white mx-auto mb-3" aria-hidden="true" />
             <h2
               id="lookbook-heading"
               className="text-white font-display uppercase text-3xl md:text-5xl tracking-tight"
@@ -554,7 +578,7 @@ export default function Homepage() {
               @drftnclothing
               <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
             </a>
-          </div>
+          </motion.div>
 
           {/* Asymmetric Photo Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
@@ -578,7 +602,7 @@ export default function Homepage() {
                   loading="lazy"
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-brand-red/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </div>
             ))}
           </div>

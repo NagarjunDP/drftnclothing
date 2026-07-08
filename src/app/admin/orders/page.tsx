@@ -31,6 +31,8 @@ export default function AdminOrders() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const [activeTab, setActiveTab] = useState<'all' | 'delivery' | 'pickup'>('all');
+
   const handleStatusChange = async (orderId: string, newStatus: Order['order_status']) => {
     try {
       await db.updateOrderStatus(orderId, { order_status: newStatus });
@@ -41,11 +43,17 @@ export default function AdminOrders() {
     }
   };
 
-  const filteredOrders = orders.filter(o => 
-    o.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    o.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    o.customer_email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredOrders = orders.filter(o => {
+    const matchesSearch = 
+      o.order_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      o.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      o.customer_email.toLowerCase().includes(searchTerm.toLowerCase());
+      
+    if (!matchesSearch) return false;
+    if (activeTab === 'delivery') return o.fulfillment_type !== 'pickup';
+    if (activeTab === 'pickup') return o.fulfillment_type === 'pickup';
+    return true;
+  });
 
   return (
     <div className="space-y-6 animate-fade-in text-zinc-900">
@@ -57,7 +65,7 @@ export default function AdminOrders() {
       </div>
 
       <div className="bg-white border border-zinc-200/60 rounded-[16px] shadow-[0_8px_30px_rgb(0,0,0,0.02)] overflow-hidden">
-        <div className="p-4 border-b border-zinc-100 flex items-center gap-4">
+        <div className="p-4 border-b border-zinc-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
             <input
@@ -68,6 +76,22 @@ export default function AdminOrders() {
               className="w-full bg-zinc-50/50 border border-zinc-200 text-zinc-900 pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-zinc-900 transition-colors rounded-lg"
             />
           </div>
+          
+          <div className="flex bg-zinc-150 p-1 rounded-lg self-start sm:self-auto border border-zinc-200/40">
+            {(['all', 'delivery', 'pickup'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-1.5 text-xs font-bold uppercase tracking-wider rounded-md transition-all ${
+                  activeTab === tab 
+                    ? 'bg-white text-zinc-900 shadow-sm' 
+                    : 'text-zinc-500 hover:text-zinc-800 bg-transparent'
+                }`}
+              >
+                {tab === 'all' ? 'All' : tab === 'delivery' ? 'Delivery' : 'Pickup'}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div>
@@ -77,12 +101,13 @@ export default function AdminOrders() {
             <>
               {/* Desktop Table View */}
               <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[800px]">
+                <table className="w-full text-left border-collapse min-w-[900px]">
                   <thead>
                     <tr className="border-b border-zinc-100 bg-zinc-50/70">
                       <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-400">Order</th>
                       <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-400">Date</th>
                       <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-400">Customer</th>
+                      <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-400">Type</th>
                       <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-400">Payment</th>
                       <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-400">Status</th>
                       <th className="p-4 text-xs font-bold uppercase tracking-wider text-zinc-400">Total</th>
@@ -91,7 +116,7 @@ export default function AdminOrders() {
                   <tbody>
                     {filteredOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="p-8 text-center text-zinc-400 text-sm">No orders found.</td>
+                        <td colSpan={7} className="p-8 text-center text-zinc-400 text-sm">No orders found.</td>
                       </tr>
                     ) : (
                       filteredOrders.map(order => (
@@ -101,7 +126,7 @@ export default function AdminOrders() {
                           className="border-b border-zinc-100 hover:bg-zinc-50/20 transition-colors cursor-pointer"
                         >
                           <td className="p-4 font-mono text-sm text-zinc-900 font-bold">{order.order_number}</td>
-                          <td className="p-4 text-sm text-zinc-600 font-medium">
+                          <td className="p-4 text-sm text-zinc-650 font-medium">
                             {new Date(order.created_at || Date.now()).toLocaleDateString()}
                           </td>
                           <td className="p-4">
@@ -109,13 +134,29 @@ export default function AdminOrders() {
                             <p className="text-xs text-zinc-400 font-medium">{order.customer_email}</p>
                           </td>
                           <td className="p-4">
-                            <span className={`inline-block px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded border ${
-                              order.payment_status === 'paid' 
-                                ? 'bg-green-50 text-green-600 border-green-100' 
-                                : 'bg-yellow-50 text-yellow-600 border-yellow-100'
+                            <span className={`inline-block px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded ${
+                              order.fulfillment_type === 'pickup' 
+                                ? 'bg-purple-50 text-purple-600 border border-purple-100' 
+                                : 'bg-blue-50 text-blue-600 border border-blue-100'
                             }`}>
-                              {order.payment_status}
+                              {order.fulfillment_type === 'pickup' ? 'Pickup' : 'Delivery'}
                             </span>
+                          </td>
+                          <td className="p-4">
+                            <div>
+                              <span className={`inline-block px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded border ${
+                                order.payment_status === 'paid' 
+                                  ? 'bg-green-50 text-green-600 border-green-100' 
+                                  : 'bg-yellow-50 text-yellow-600 border-yellow-100'
+                              }`}>
+                                {order.payment_status}
+                              </span>
+                              {order.payment_type === 'cod_with_deposit' && (
+                                <span className="block text-[9px] font-mono text-zinc-400 mt-1 uppercase font-bold">
+                                  COD (Dep Paid)
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="p-4" onClick={(e) => e.stopPropagation()}>
                             <div className="relative inline-block text-left">
@@ -126,17 +167,23 @@ export default function AdminOrders() {
                                   handleStatusChange(order.id, e.target.value as any);
                                 }}
                                 className={`appearance-none bg-white border px-3 py-1.5 pr-8 text-xs font-bold uppercase tracking-wider rounded cursor-pointer focus:outline-none transition-colors border-zinc-200 text-zinc-800 ${
-                                  order.order_status === 'delivered' ? 'text-green-600 border-green-200 bg-green-50/30' :
-                                  order.order_status === 'cancelled' ? 'text-red-600 border-red-200 bg-red-50/30' :
+                                  order.order_status === 'delivered' || order.order_status === 'collected' ? 'text-green-600 border-green-200 bg-green-50/30' :
+                                  order.order_status === 'cancelled' || order.order_status === 'failed' ? 'text-red-600 border-red-200 bg-red-50/30' :
                                   'hover:bg-zinc-50'
                                 }`}
                               >
-                                <option value="placed">Placed</option>
+                                <option value="pending_payment">Pending Payment</option>
+                                <option value="payment_verifying">Payment Verifying</option>
                                 <option value="confirmed">Confirmed</option>
-                                <option value="packed">Packed</option>
+                                <option value="preparing">Preparing</option>
+                                <option value="ready_for_pickup">Ready for Pickup</option>
                                 <option value="shipped">Shipped</option>
                                 <option value="delivered">Delivered</option>
+                                <option value="collected" disabled>Collected (Verification Required)</option>
+                                <option value="failed">Failed</option>
+                                <option value="expired">Expired</option>
                                 <option value="cancelled">Cancelled</option>
+                                <option value="payment_mismatch">Payment Mismatch</option>
                               </select>
                               <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400" />
                             </div>
@@ -170,13 +217,22 @@ export default function AdminOrders() {
                         </div>
                         <div className="text-right">
                           <span className="font-mono text-sm font-bold text-zinc-900 block">₹{(order.total / 100).toFixed(2)}</span>
-                          <span className={`inline-block px-1.5 py-0.5 mt-1 text-[8px] font-bold uppercase tracking-wider rounded border ${
-                            order.payment_status === 'paid' 
-                              ? 'bg-green-50 text-green-600 border-green-100' 
-                              : 'bg-yellow-50 text-yellow-600 border-yellow-100'
-                          }`}>
-                            {order.payment_status}
-                          </span>
+                          <div className="flex gap-1.5 items-center mt-1 justify-end">
+                            <span className={`inline-block px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded border ${
+                              order.fulfillment_type === 'pickup' 
+                                ? 'bg-purple-50 text-purple-650 border-purple-100' 
+                                : 'bg-blue-50 text-blue-650 border-blue-100'
+                            }`}>
+                              {order.fulfillment_type === 'pickup' ? 'Pickup' : 'Delivery'}
+                            </span>
+                            <span className={`inline-block px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded border ${
+                              order.payment_status === 'paid' 
+                                ? 'bg-green-50 text-green-600 border-green-100' 
+                                : 'bg-yellow-50 text-yellow-600 border-yellow-100'
+                            }`}>
+                              {order.payment_status}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -188,7 +244,7 @@ export default function AdminOrders() {
 
                       {/* Status Dropdown */}
                       <div className="flex items-center justify-between pt-1" onClick={(e) => e.stopPropagation()}>
-                        <span className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">Change Status</span>
+                        <span className="text-[10px] text-zinc-450 uppercase tracking-widest font-bold">Change Status</span>
                         <div className="relative">
                           <select
                             value={order.order_status}
@@ -197,17 +253,23 @@ export default function AdminOrders() {
                               handleStatusChange(order.id, e.target.value as any);
                             }}
                             className={`appearance-none bg-white border px-3 py-1.5 pr-8 text-xs font-bold uppercase tracking-wider rounded cursor-pointer focus:outline-none transition-colors border-zinc-200 text-zinc-800 ${
-                              order.order_status === 'delivered' ? 'text-green-600 border-green-200 bg-green-50/30' :
-                              order.order_status === 'cancelled' ? 'text-red-600 border-red-200 bg-red-50/30' :
+                              order.order_status === 'delivered' || order.order_status === 'collected' ? 'text-green-600 border-green-200 bg-green-50/30' :
+                              order.order_status === 'cancelled' || order.order_status === 'failed' ? 'text-red-600 border-red-200 bg-red-50/30' :
                               'hover:bg-zinc-50'
                             }`}
                           >
-                            <option value="placed">Placed</option>
+                            <option value="pending_payment">Pending Payment</option>
+                            <option value="payment_verifying">Payment Verifying</option>
                             <option value="confirmed">Confirmed</option>
-                            <option value="packed">Packed</option>
+                            <option value="preparing">Preparing</option>
+                            <option value="ready_for_pickup">Ready for Pickup</option>
                             <option value="shipped">Shipped</option>
                             <option value="delivered">Delivered</option>
+                            <option value="collected" disabled>Collected (Verification Required)</option>
+                            <option value="failed">Failed</option>
+                            <option value="expired">Expired</option>
                             <option value="cancelled">Cancelled</option>
+                            <option value="payment_mismatch">Payment Mismatch</option>
                           </select>
                           <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400" />
                         </div>

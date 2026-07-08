@@ -4,7 +4,8 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, Plus, Minus, ShoppingBag, CreditCard, Ruler, Info, X } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ChevronRight, Plus, Minus, ShoppingBag, CreditCard, Ruler, Info, X, Bell } from 'lucide-react';
 import { dbService } from '@/lib/db';
 import { Product } from '@/types';
 import { useCartStore } from '@/lib/cartStore';
@@ -34,6 +35,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   const [quantity, setQuantity] = useState<number>(1);
   const [activeTab, setActiveTab] = useState<'details' | 'shipping' | 'returns' | ''>('details');
   const [sizeChartOpen, setSizeChartOpen] = useState<boolean>(false);
+  const [isSubscribing, setIsSubscribing] = useState<boolean>(false);
 
   // Cart operations
   const addItem = useCartStore((state) => state.addItem);
@@ -77,7 +79,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   if (!product) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center py-20 px-6 space-y-4">
-        <Info className="w-16 h-16 text-brand-red stroke-[1]" />
+        <Info className="w-16 h-16 text-white/40 stroke-[1]" />
         <div>
           <h2 className="text-2xl font-black uppercase tracking-wider text-brand-offwhite">PRODUCT NOT FOUND</h2>
           <p className="text-zinc-500 text-xs mt-1">This drop might have ended or is currently archived.</p>
@@ -91,6 +93,43 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       </div>
     );
   }
+
+  const isCompletelyOutOfStock = product ? product.sizes.every((s) => (product.stock_quantity[s] || 0) <= 0) : false;
+
+  const handleNotifyMe = async () => {
+    try {
+      setIsSubscribing(true);
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+
+      const applicationServerKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      });
+
+      const res = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: subscription.endpoint,
+          keys: { p256dh: subscription.toJSON().keys?.p256dh, auth: subscription.toJSON().keys?.auth },
+          productId: product?.id,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to subscribe');
+      toast.success('You will be notified when this is back in stock!');
+    } catch (e) {
+      console.error(e);
+      toast.error('Could not enable notifications.');
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
 
   // Stock check helpers
   const getStockForSize = (size: string) => {
@@ -239,7 +278,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                     key={idx}
                     onClick={() => setActiveImage(img)}
                     className={`aspect-[3/4] w-full bg-zinc-950 rounded border overflow-hidden transition-all ${
-                      activeImage === img ? 'border-brand-red' : 'border-zinc-900/60 hover:border-zinc-700'
+                      activeImage === img ? 'border-white' : 'border-zinc-900/60 hover:border-zinc-700'
                     }`}
                   >
                     <img 
@@ -274,7 +313,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
         <div className="space-y-6 flex flex-col justify-between">
           <div className="space-y-4">
             <div>
-              <span className="text-xs text-brand-red font-bold uppercase tracking-[0.2em]">{product.category}</span>
+              <span className="text-xs text-white/60 font-bold uppercase tracking-[0.2em]">{product.category}</span>
               <h1 className="text-3xl md:text-4xl font-display uppercase tracking-wider text-brand-offwhite mt-1">
                 {product.name}
               </h1>
@@ -321,9 +360,9 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                 <span className="text-zinc-400">Select Size:</span>
                 <button
                   onClick={() => setSizeChartOpen(true)}
-                  className="text-brand-offwhite hover:text-brand-red transition-colors flex items-center gap-1.5"
+                  className="text-brand-offwhite hover:text-white transition-colors flex items-center gap-1.5"
                 >
-                  <Ruler className="w-3.5 h-3.5 text-brand-red" />
+                  <Ruler className="w-3.5 h-3.5 text-white/60" />
                   Sizing Guide
                 </button>
               </div>
@@ -344,13 +383,13 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
                       className={`min-w-[3rem] h-12 px-3 text-xs border uppercase font-bold flex items-center justify-center rounded-none transition-all relative ${isOutOfStock
                           ? 'border-zinc-900 text-zinc-700 bg-zinc-950 cursor-not-allowed line-through'
                           : selectedSize === size
-                            ? 'border-brand-red bg-brand-red text-brand-offwhite'
+                            ? 'border-white bg-white text-black'
                             : 'border-zinc-800 text-brand-offwhite hover:border-zinc-500'
                         }`}
                     >
                       {size}
                       {stock > 0 && stock <= 3 && (
-                        <span className="absolute -top-1.5 -right-1 bg-brand-red text-[8px] text-brand-offwhite px-1 rounded-none scale-90">
+                        <span className="absolute -top-1.5 -right-1 bg-white text-[8px] text-black px-1 rounded-none scale-90 border border-white/10">
                           {stock}
                         </span>
                       )}
@@ -387,34 +426,47 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
             )}
 
             {/* Actions Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-2">
-              <button
-                onClick={handleAddToCart}
-                disabled={isAdding}
-                className="btn-primary flex-1 relative overflow-hidden"
-              >
-                <span
-                  className={`absolute inset-0 bg-brand-red transition-transform duration-300 origin-left ${isAdding ? 'scale-x-100' : 'scale-x-0'
-                    }`}
-                />
-                <span className="relative z-10 flex items-center justify-center gap-2">
-                  {isAdding ? (
-                    <span className="animate-scale-in">✓</span>
-                  ) : (
-                    <>
-                      <ShoppingBag className="w-4 h-4" />
-                      <span>Add to Bag</span>
-                    </>
-                  )}
-                </span>
-              </button>
-              <button
-                onClick={handleBuyNow}
-                className="btn-outline flex-1"
-              >
-                <span>Buy It Now</span>
-              </button>
-            </div>
+            {isCompletelyOutOfStock ? (
+              <div className="pt-2">
+                <button
+                  onClick={handleNotifyMe}
+                  disabled={isSubscribing}
+                  className="btn-primary w-full flex items-center justify-center gap-2 bg-white hover:bg-zinc-200 text-black py-4 font-bold transition-colors"
+                >
+                  <Bell className="w-4 h-4" />
+                  <span>{isSubscribing ? 'Subscribing...' : 'Notify Me When Available'}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <button
+                  onClick={handleAddToCart}
+                  disabled={isAdding}
+                  className="btn-primary flex-1 relative overflow-hidden"
+                >
+                  <span
+                    className={`absolute inset-0 bg-white transition-transform duration-300 origin-left ${isAdding ? 'scale-x-100' : 'scale-x-0'
+                      }`}
+                  />
+                  <span className={`relative z-10 flex items-center justify-center gap-2 ${isAdding ? 'text-black font-bold' : ''}`}>
+                    {isAdding ? (
+                      <span className="animate-scale-in">✓</span>
+                    ) : (
+                      <>
+                        <ShoppingBag className="w-4 h-4" />
+                        <span>Add to Bag</span>
+                      </>
+                    )}
+                  </span>
+                </button>
+                <button
+                  onClick={handleBuyNow}
+                  className="btn-outline flex-1"
+                >
+                  <span>Buy It Now</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Trust Strip */}
@@ -530,35 +582,85 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
               View All
             </Link>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
-            {relatedProducts.map((p) => (
-              <Link
-                key={p.id}
-                href={`/shop/${p.slug}`}
-                className="group flex flex-col product-card"
-                aria-label={`View ${p.name} — ₹${(p.price / 100).toLocaleString('en-IN')}`}
-              >
-                <div className="product-card-image aspect-[3/4] bg-brand-graphite">
-                  <NextImage
-                    src={p.images[0] || 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=600'}
-                    alt={`${p.name} — ${p.category} by DRFTN Clothing`}
-                    fill
-                    sizes="(max-width: 640px) 50vw, 25vw"
-                    className="object-cover"
-                  />
-                  <div className="product-card-overlay" aria-hidden="true" />
-                </div>
-                <div className="pt-3 space-y-1">
-                  <p className="text-[9px] text-brand-stone uppercase tracking-[0.2em] font-semibold">{p.category}</p>
-                  <h3 className="text-xs font-medium text-brand-offwhite uppercase line-clamp-1 group-hover:text-brand-amber transition-colors font-body">
-                    {p.name}
-                  </h3>
-                  <p className="text-xs font-semibold text-brand-offwhite font-body">
-                    ₹{(p.price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
-                  </p>
-                </div>
-              </Link>
-            ))}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-[8px] md:gap-5">
+            {relatedProducts.map((p) => {
+              const isOutOfStock = p.sizes.every((s) => (p.stock_quantity[s] || 0) === 0);
+              return (
+                <motion.div
+                  key={p.id}
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-10%' }}
+                  transition={{ duration: 0.4, ease: 'easeOut' }}
+                  className="w-full"
+                >
+                  <Link
+                    href={`/shop/${p.slug}`}
+                    className="group flex flex-col product-card text-left"
+                    aria-label={`View ${p.name} — ₹${(p.price / 100).toLocaleString('en-IN')}`}
+                  >
+                    <motion.div
+                      whileTap={{ scale: 0.97, filter: 'brightness(1.08)' }}
+                      transition={{ duration: 0.15 }}
+                      className="flex flex-col w-full text-left"
+                    >
+                      {/* Image Container */}
+                      <div className="relative overflow-hidden rounded-xl bg-brand-charcoal aspect-[4/5] w-full border border-white/[0.08] shadow-[0_12px_40px_rgba(0,0,0,0.5)]">
+                        <NextImage
+                          src={p.images[0] || 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=600'}
+                          alt={`${p.name} — ${p.category} by DRFTN Clothing`}
+                          fill
+                          sizes="(max-width: 640px) 50vw, 25vw"
+                          className="object-cover transition-transform duration-[750ms] ease-out group-hover:scale-[1.01]"
+                        />
+                        {/* Bottom Gradient Legibility Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent pointer-events-none" />
+
+                        {/* Outlined sold out/sale tag badges */}
+                        {isOutOfStock ? (
+                          <div className="absolute top-3.5 left-3.5 z-20 border border-white/10 text-white/50 bg-black/40 px-2 py-0.5 rounded-full backdrop-blur-[2px]">
+                            <span className="text-[9px] font-mono font-bold tracking-widest uppercase">
+                              SOLD OUT
+                            </span>
+                          </div>
+                        ) : p.compare_price && p.compare_price > p.price ? (
+                          <div className="absolute top-3.5 left-3.5 z-20 border border-white/20 text-white/95 bg-black/40 px-2 py-0.5 rounded-full backdrop-blur-[2px]">
+                            <span className="text-[9px] font-mono font-bold tracking-widest uppercase">
+                              SALE
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* Details Block */}
+                      <div className="pt-3 pb-1 flex flex-col text-left space-y-1">
+                        <p className="text-[9px] text-brand-stone uppercase tracking-[0.2em] font-semibold">
+                          {p.category}
+                        </p>
+                        <h3 className="text-xs font-semibold text-brand-offwhite tracking-wide uppercase line-clamp-1 group-hover:text-white transition-colors duration-200 font-body">
+                          {p.name}
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-brand-offwhite font-body">
+                            ₹{(p.price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                          </span>
+                          {p.compare_price && p.compare_price > p.price && (
+                            <>
+                              <span className="text-[10px] text-brand-stone line-through font-body">
+                                ₹{(p.compare_price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                              </span>
+                              <span className="text-[10px] font-mono text-white/50 tracking-wider">
+                                -{Math.round(((p.compare_price - p.price) / p.compare_price) * 100)}%
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  </Link>
+                </motion.div>
+              );
+            })}
           </div>
         </section>
       )}
@@ -573,7 +675,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 max-w-lg w-[90%] z-50 bg-brand-black border border-zinc-900 rounded-md p-6 overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b border-zinc-900 pb-4 mb-6">
               <h3 className="text-sm font-bold uppercase tracking-wider text-brand-offwhite flex items-center gap-2">
-                <Ruler className="w-4 h-4 text-brand-red" />
+                <Ruler className="w-4 h-4 text-white/60" />
                 STREETWEAR SIZING CHART
               </h3>
               <button

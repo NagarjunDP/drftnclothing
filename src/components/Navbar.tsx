@@ -7,7 +7,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ShoppingBag, X, Menu, Search } from 'lucide-react';
 import { useCartStore } from '../lib/cartStore';
 import { useAnimationStore } from '../lib/animationStore';
-import { SignInButton, UserButton, useUser } from '@clerk/nextjs';
+import { SignInButton, UserButton, useUser, useClerk } from '@clerk/nextjs';
+import { motion, AnimatePresence } from 'framer-motion';
 import AnnouncementTicker from './AnnouncementTicker';
 import { gsap } from 'gsap';
 
@@ -21,8 +22,11 @@ const NAV_LINKS = [
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded, user } = useUser();
+  const { signOut } = useClerk();
+  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
   const setIsOpen = useCartStore((state) => state.setIsOpen);
+  const isCartOpen = useCartStore((state) => state.isOpen);
   const cartCount = useCartStore((state) => state.items.reduce((acc, item) => acc + item.quantity, 0));
   const cartPulseActive = useAnimationStore((state) => state.cartPulseActive);
 
@@ -90,15 +94,14 @@ export default function Navbar() {
 
       {/* ── Main Navigation Top Rail ── */}
       <header
-        className={`w-full sticky top-0 z-[2000] transition-all duration-300 ${
-          isScrolled || !isHomepage
+        className={`w-full sticky top-0 z-[2000] transition-all duration-300 hidden md:block ${isScrolled || !isHomepage
             ? 'bg-[#0A0A0A] border-b border-brand-graphite/40 shadow-[0_4px_30px_rgba(0,0,0,0.5)]'
             : 'bg-transparent border-b border-transparent'
-        }`}
+          }`}
         role="banner"
       >
         {/* Subtle top scrim for nav and logo contrast */}
-        <div 
+        <div
           className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/85 to-transparent pointer-events-none z-[-1]"
           aria-hidden="true"
         />
@@ -132,11 +135,10 @@ export default function Navbar() {
                 key={link.href}
                 href={link.href}
                 role="listitem"
-                className={`text-[10px] font-bold tracking-[0.2em] uppercase transition-colors duration-200 hover:text-white ${
-                  pathname === link.href || pathname?.startsWith(link.href + '?')
+                className={`text-[10px] font-bold tracking-[0.2em] uppercase transition-colors duration-200 hover:text-white ${pathname === link.href || pathname?.startsWith(link.href + '?')
                     ? 'text-brand-red'
                     : 'text-brand-silver'
-                }`}
+                  }`}
                 aria-current={pathname === link.href ? 'page' : undefined}
               >
                 {link.label}
@@ -146,7 +148,7 @@ export default function Navbar() {
 
           {/* Action Icons (Search, Cart, User, Hamburger Menu) */}
           <div className="flex items-center gap-3 md:gap-4">
-            
+
             {/* Search Trigger */}
             <button
               onClick={() => setSearchOpen(true)}
@@ -159,15 +161,14 @@ export default function Navbar() {
             {/* Cart Trigger */}
             <button
               onClick={() => setIsOpen(true)}
-              className={`relative flex items-center p-2.5 transition-all duration-200 ${
-                cartPulseActive ? 'scale-125 text-brand-red' : 'text-brand-silver hover:text-white'
-              }`}
+              className={`relative flex items-center p-2.5 transition-all duration-200 ${cartPulseActive ? 'scale-125 text-white' : 'text-brand-silver hover:text-white'
+                }`}
               aria-label={`Open cart${mounted && cartCount > 0 ? `, ${cartCount} items` : ''}`}
             >
               <ShoppingBag className="w-4.5 h-4.5 stroke-[1.8]" />
               {mounted && cartCount > 0 && (
                 <span
-                  className="absolute top-1.5 right-1.5 bg-brand-red text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center animate-scale-in"
+                  className="absolute top-1.5 right-1.5 bg-white text-black text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center animate-scale-in"
                   aria-hidden="true"
                 >
                   {cartCount}
@@ -213,12 +214,154 @@ export default function Navbar() {
           {/* Scroll Progress Bar / Speedometer Underline indicator */}
           <div
             ref={progressBarRef}
-            className="absolute bottom-0 left-0 h-[2px] bg-brand-red"
+            className="absolute bottom-0 left-0 h-[2px] bg-white"
             style={{ width: '0%' }}
             aria-hidden="true"
           />
         </nav>
       </header>
+
+      {/* ── Mobile Navigation Top Rail — hidden when cart is open to prevent collision ── */}
+      {!isCartOpen && (
+        <header
+          className={`w-full sticky top-0 z-[2000] transition-all duration-300 md:hidden ${
+            isScrolled
+              ? 'bg-black/40 backdrop-blur-md border-b border-white/5 shadow-[0_4px_30px_rgba(0,0,0,0.5)]'
+              : 'bg-transparent border-b border-transparent'
+          }`}
+        >
+          <div className="h-16 flex items-center justify-between px-6 relative">
+            {/* Left: Wordmark Logo */}
+            <Link
+              href="/"
+              className="flex items-center select-none group flex-shrink-0"
+              aria-label="DRFTN Clothing — Home"
+            >
+              <div className="relative w-[94px] h-6">
+                <Image
+                  src="/logo-cropped.png"
+                  alt="DRFTN Clothing"
+                  fill
+                  priority
+                  sizes="120px"
+                  className="object-contain object-left transition-opacity duration-300 group-hover:opacity-80"
+                />
+              </div>
+            </Link>
+
+            {/* Right: Cart icon + Auth control */}
+            <div className="flex items-center gap-3">
+              {/* Cart Icon with Badge */}
+              <button
+                onClick={() => setIsOpen(true)}
+                className={`relative flex items-center justify-center p-2 transition-all duration-200 ${cartPulseActive ? 'scale-125 text-white' : 'text-zinc-400 hover:text-white'}`}
+                aria-label={`Open cart${mounted && cartCount > 0 ? `, ${cartCount} items` : ''}`}
+              >
+                <ShoppingBag className="w-5 h-5 stroke-[1.8]" />
+                {mounted && cartCount > 0 && (
+                  <span
+                    className="absolute top-1 right-1 bg-white text-black text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center"
+                    aria-hidden="true"
+                  >
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Auth Control */}
+              <div className="relative">
+                {isLoaded && !isSignedIn && (
+                  <SignInButton mode="modal">
+                    <button
+                      className="px-3.5 py-1.5 rounded-full border border-white/20 bg-transparent text-[11px] font-mono tracking-widest text-white uppercase transition-colors hover:border-white/50 active:bg-white/10"
+                      aria-label="Sign In"
+                    >
+                      SIGN IN
+                    </button>
+                  </SignInButton>
+                )}
+
+                {isLoaded && isSignedIn && (
+                  <button
+                    onClick={() => setMobileDropdownOpen(!mobileDropdownOpen)}
+                    className="relative flex items-center justify-center rounded-full p-0.5"
+                    style={{ animation: 'avatarGlowPulse 3s ease-in-out infinite' }}
+                    aria-label="Open Account Dropdown"
+                  >
+                    {user?.imageUrl ? (
+                      <div className="relative w-8 h-8 rounded-full overflow-hidden border border-white/20">
+                        <Image
+                          src={user.imageUrl}
+                          alt={user.fullName || 'User Avatar'}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-brand-graphite border border-white/20 text-white flex items-center justify-center text-xs font-mono font-bold">
+                        {user?.firstName?.charAt(0) || user?.username?.charAt(0) || 'U'}
+                      </div>
+                    )}
+                  </button>
+                )}
+
+                {/* Account Dropdown */}
+                <AnimatePresence>
+                  {mobileDropdownOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40 bg-transparent"
+                        onClick={() => setMobileDropdownOpen(false)}
+                      />
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: -10, x: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -10, x: 10 }}
+                        transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                        className="absolute right-0 mt-3 w-48 z-50 rounded-2xl border border-white/10 bg-[#0A0A0A]/85 backdrop-blur-2xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] overflow-hidden"
+                      >
+                        <div className="py-2 flex flex-col font-body">
+                          <Link
+                            href="/account/orders"
+                            onClick={() => setMobileDropdownOpen(false)}
+                            className="px-5 py-3 text-xs uppercase tracking-wider text-zinc-300 hover:text-white hover:bg-white/5 transition-colors border-b border-white/5"
+                          >
+                            Orders
+                          </Link>
+                          <Link
+                            href="/profile"
+                            onClick={() => setMobileDropdownOpen(false)}
+                            className="px-5 py-3 text-xs uppercase tracking-wider text-zinc-300 hover:text-white hover:bg-white/5 transition-colors border-b border-white/5"
+                          >
+                            Profile
+                          </Link>
+                          <Link
+                            href="/wishlist"
+                            onClick={() => setMobileDropdownOpen(false)}
+                            className="px-5 py-3 text-xs uppercase tracking-wider text-zinc-300 hover:text-white hover:bg-white/5 transition-colors border-b border-white/5"
+                          >
+                            Wishlist
+                          </Link>
+                          <button
+                            onClick={async () => {
+                              setMobileDropdownOpen(false);
+                              await signOut();
+                              router.push('/');
+                            }}
+                            className="px-5 py-3 text-left text-xs uppercase tracking-wider text-white hover:bg-white/10 transition-colors"
+                          >
+                            Logout
+                          </button>
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          </div>
+        </header>
+      )}
 
       {/* ── Search Overlay Modal ── */}
       {searchOpen && (

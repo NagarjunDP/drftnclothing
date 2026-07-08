@@ -203,7 +203,7 @@ export default function CartPage() {
                         removeItem(item.id, item.size);
                         toast.info(`Removed ${item.name} from bag.`);
                       }}
-                      className="text-brand-stone hover:text-brand-red transition-colors flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold"
+                      className="text-brand-stone hover:text-white transition-colors flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold"
                       aria-label={`Remove ${item.name} from bag`}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -281,7 +281,7 @@ export default function CartPage() {
                     <span className="font-bold">−₹{(discountAmount / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}</span>
                     <button
                       onClick={handleRemovePromo}
-                      className="text-brand-stone hover:text-brand-red text-[9px] uppercase font-bold tracking-widest transition-colors"
+                      className="text-brand-stone hover:text-white text-[9px] uppercase font-bold tracking-widest transition-colors"
                       aria-label="Remove promo code"
                     >
                       Remove
@@ -317,7 +317,7 @@ export default function CartPage() {
             {/* Proceed CTA */}
             <Link
               href="/checkout"
-              className="btn-electric w-full text-center bg-brand-offwhite text-brand-black hover:bg-brand-red hover:text-brand-offwhite font-bold text-xs uppercase tracking-widest py-4 px-6 transition-all duration-300 relative"
+              className="btn-electric w-full text-center bg-brand-offwhite text-brand-black hover:bg-white transition-all duration-300 relative border border-transparent font-bold text-xs uppercase tracking-widest py-4 px-6"
             >
               <span>Proceed to Checkout</span>
             </Link>

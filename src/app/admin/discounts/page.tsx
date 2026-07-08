@@ -117,7 +117,7 @@ export default function AdminDiscounts() {
         </div>
         <button
           onClick={() => setIsCreateOpen(true)}
-          className="bg-brand-red text-white px-6 py-3 font-bold uppercase tracking-widest text-xs hover:bg-red-600 transition-colors flex items-center gap-2"
+          className="bg-white hover:bg-zinc-200 text-black px-6 py-3 font-bold uppercase tracking-widest text-xs transition-colors flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           Create Code
@@ -334,7 +334,7 @@ export default function AdminDiscounts() {
                     id="is_active"
                     checked={newCode.is_active}
                     onChange={(e) => setNewCode({ ...newCode, is_active: e.target.checked })}
-                    className="rounded border-zinc-800 bg-zinc-950 text-brand-red focus:ring-brand-red"
+                    className="rounded border-zinc-800 bg-zinc-950 text-white focus:ring-white"
                   />
                   <label htmlFor="is_active" className="text-xs uppercase tracking-wider text-zinc-400 font-bold select-none cursor-pointer">
                     Enable Code Immediately
@@ -343,7 +343,7 @@ export default function AdminDiscounts() {
 
                 <button
                   type="submit"
-                  className="w-full bg-brand-red text-white py-4 font-bold uppercase tracking-widest text-xs hover:bg-red-600 transition-colors mt-4"
+                  className="w-full bg-white hover:bg-zinc-200 text-black py-4 font-bold uppercase tracking-widest text-xs transition-colors mt-4"
                 >
                   Create Code
                 </button>

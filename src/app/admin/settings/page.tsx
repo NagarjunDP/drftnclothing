@@ -223,7 +223,7 @@ export default function AdminSettings() {
                 name="default_shipping_charge"
                 value={settings.default_shipping_charge}
                 onChange={handleChange}
-                className="w-full bg-zinc-900/80 border border-zinc-700 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-brand-red transition-colors"
+                className="w-full bg-zinc-900/80 border border-zinc-700 text-brand-offwhite px-4 py-3 text-sm focus:outline-none focus:border-white transition-colors"
               />
             </div>
           </div>
@@ -233,7 +233,7 @@ export default function AdminSettings() {
           <button
             type="submit"
             disabled={isSaving}
-            className="bg-brand-red text-white px-8 py-4 font-bold uppercase tracking-widest text-sm hover:bg-red-600 transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            className="bg-white hover:bg-zinc-200 text-black px-8 py-4 font-bold uppercase tracking-widest text-sm transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             {isSaving ? 'Saving...' : 'Save Settings'}
             {!isSaving && <Save className="w-4 h-4" />}

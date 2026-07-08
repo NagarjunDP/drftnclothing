@@ -4,16 +4,20 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/db';
 import { Order, StoreSettings } from '@/types';
-import { ArrowLeft, Clipboard, Check, Phone, Mail, MapPin, CreditCard, ShoppingBag, Truck, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Clipboard, Check, Phone, Mail, MapPin, CreditCard, ShoppingBag, Truck, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/components/ToastContainer';
 
 const STATUS_HIERARCHY: Record<string, number> = {
-  placed: 1,
-  confirmed: 2,
-  packed: 3,
-  shipped: 4,
-  delivered: 5,
-  cancelled: 6,
+  pending_payment: 1,
+  placed: 2,
+  payment_verifying: 2,
+  confirmed: 3,
+  preparing: 4,
+  ready_for_pickup: 5,
+  shipped: 5,
+  delivered: 6,
+  collected: 6,
+  cancelled: 7,
 };
 
 export default function AdminOrderDetail() {
@@ -28,6 +32,7 @@ export default function AdminOrderDetail() {
   const [isBookingShipment, setIsBookingShipment] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [envStatus, setEnvStatus] = useState({ razorpay: false, shiprocket: false, makeWebhook: false });
+  const [pickupCodeInput, setPickupCodeInput] = useState('');
 
   // Manual shipping fields
   const [trackingNumber, setTrackingNumber] = useState('');
@@ -68,11 +73,12 @@ export default function AdminOrderDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
-  const handleStatusChange = async (newStatus: Order['order_status']) => {
+  const handleStatusChange = async (newStatus: Order['order_status'], extraData: Record<string, any> = {}) => {
     if (!order) return;
     
     // Client-side guard for final states
-    if (order.order_status === 'delivered' || order.order_status === 'cancelled') {
+    const finalStates = ['delivered', 'collected', 'cancelled'];
+    if (finalStates.includes(order.order_status)) {
       addToast(`Cannot change status. Order is already in a final state: "${order.order_status}"`, 'error');
       return;
     }
@@ -91,7 +97,10 @@ export default function AdminOrderDetail() {
       const res = await fetch(`/api/admin/orders/${order.id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ 
+          status: newStatus,
+          ...extraData
+        }),
       });
 
       if (!res.ok) {
@@ -100,6 +109,7 @@ export default function AdminOrderDetail() {
       }
 
       addToast(`Order status updated to "${newStatus}"`, 'success');
+      setPickupCodeInput('');
       fetchOrderDetails();
     } catch (err: any) {
       console.error(err);
@@ -153,6 +163,10 @@ export default function AdminOrderDetail() {
   const copyToClipboard = () => {
     if (!order) return;
     const addr = order.shipping_address;
+    if (!addr) {
+      addToast('No shipping address available to copy', 'error');
+      return;
+    }
     const text = `${order.customer_name}\n${order.customer_phone}\n${addr.line1}\n${addr.line2 || ''}\n${addr.city}, ${addr.state} - ${addr.pincode}`;
     
     navigator.clipboard.writeText(text);
@@ -263,14 +277,28 @@ export default function AdminOrderDetail() {
             </div>
           </div>
 
-          {/* Shipment Booking section */}
+          {/* Shipment Booking section (Ignored/bypassed if pickup) */}
           <div className="bg-zinc-900/30 border border-zinc-800 p-6 md:p-8 space-y-6">
             <h2 className="text-sm font-bold text-brand-offwhite uppercase tracking-widest border-b border-zinc-800 pb-3 flex items-center gap-2">
               <Truck className="w-4 h-4 text-brand-red" />
               Logistics & Shipment
             </h2>
 
-            {order.tracking_number ? (
+            {order.fulfillment_type === 'pickup' ? (
+              <div className="bg-zinc-950/45 border border-zinc-850 p-6 rounded text-left space-y-2">
+                <div className="flex items-center gap-2 text-purple-400">
+                  <ShoppingBag className="w-4 h-4" />
+                  <span className="font-bold text-xs uppercase tracking-wider">Store Pickup Order</span>
+                </div>
+                <p className="text-xs text-zinc-500 leading-normal">
+                  Shiprocket shipping is bypassed for this order. Verification of the 6-digit customer pickup code is required at the counter.
+                </p>
+                <div className="mt-3 p-3 bg-zinc-900/50 border border-zinc-850 font-mono text-xs rounded flex justify-between items-center">
+                  <span className="text-zinc-500">Security Code:</span>
+                  <span className="text-white font-bold tracking-widest">{order.pickup_code}</span>
+                </div>
+              </div>
+            ) : order.tracking_number ? (
               <div className="bg-zinc-950/40 border border-zinc-850 p-6 rounded space-y-4">
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="w-5 h-5 text-green-500" />
@@ -307,7 +335,7 @@ export default function AdminOrderDetail() {
                     <button
                       type="submit"
                       disabled={isBookingShipment}
-                      className="bg-brand-red text-white px-6 py-3 font-bold uppercase tracking-widest text-xs hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                      className="bg-white hover:bg-zinc-200 text-black px-6 py-3 font-bold uppercase tracking-widest text-xs transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                       {isBookingShipment ? 'Booking on Shiprocket...' : 'Book Automatic Shipment'}
                     </button>
@@ -326,7 +354,7 @@ export default function AdminOrderDetail() {
                           placeholder="e.g. Delhivery / BlueDart"
                           value={courierPartner}
                           onChange={(e) => setCourierPartner(e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-3 py-2 text-xs focus:outline-none focus:border-brand-red"
+                          className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-3 py-2 text-xs focus:outline-none focus:border-white"
                           required
                         />
                       </div>
@@ -337,7 +365,7 @@ export default function AdminOrderDetail() {
                           placeholder="e.g. 740616451"
                           value={trackingNumber}
                           onChange={(e) => setTrackingNumber(e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-3 py-2 text-xs focus:outline-none focus:border-brand-red font-mono"
+                          className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite px-3 py-2 text-xs focus:outline-none focus:border-white font-mono"
                           required
                         />
                       </div>
@@ -346,7 +374,7 @@ export default function AdminOrderDetail() {
                     <button
                       type="submit"
                       disabled={isBookingShipment}
-                      className="bg-brand-offwhite text-brand-black px-6 py-3 font-bold uppercase tracking-widest text-xs hover:bg-brand-red hover:text-white transition-colors"
+                      className="bg-brand-offwhite text-brand-black px-6 py-3 font-bold uppercase tracking-widest text-xs hover:bg-white transition-colors"
                     >
                       {isBookingShipment ? 'Saving Tracking Info...' : 'Save Manual Tracking'}
                     </button>
@@ -370,24 +398,53 @@ export default function AdminOrderDetail() {
               <label className="text-[10px] uppercase font-bold text-zinc-500 block">Change Order Status</label>
               <select
                 value={order.order_status}
-                disabled={isUpdatingStatus || order.order_status === 'delivered' || order.order_status === 'cancelled'}
+                disabled={isUpdatingStatus || order.order_status === 'delivered' || order.order_status === 'collected' || order.order_status === 'cancelled'}
                 onChange={(e) => handleStatusChange(e.target.value as any)}
                 className={`w-full bg-zinc-950 border px-4 py-3 text-xs font-bold uppercase tracking-wider rounded cursor-pointer focus:outline-none disabled:opacity-65 ${
-                  order.order_status === 'delivered' ? 'border-green-900 text-green-500' :
+                  order.order_status === 'delivered' || order.order_status === 'collected' ? 'border-green-900 text-green-500' :
                   order.order_status === 'cancelled' ? 'border-red-900 text-red-500' :
                   'border-zinc-800 text-brand-offwhite focus:border-brand-red'
                 }`}
               >
-                <option value="placed">Placed</option>
+                <option value="pending_payment">Pending Payment</option>
+                <option value="payment_verifying">Payment Verifying</option>
                 <option value="confirmed">Confirmed</option>
-                <option value="packed">Packed</option>
+                <option value="preparing">Preparing</option>
+                <option value="ready_for_pickup">Ready for Pickup</option>
                 <option value="shipped">Shipped</option>
                 <option value="delivered">Delivered</option>
+                <option value="collected" disabled>Collected (Verification Required)</option>
+                <option value="failed">Failed</option>
+                <option value="expired">Expired</option>
                 <option value="cancelled">Cancelled</option>
+                <option value="payment_mismatch">Payment Mismatch</option>
               </select>
             </div>
 
-            {(order.order_status === 'delivered' || order.order_status === 'cancelled') && (
+            {/* Collected verification panel */}
+            {order.fulfillment_type === 'pickup' && order.order_status === 'ready_for_pickup' && (
+              <div className="mt-4 pt-4 border-t border-zinc-800 space-y-3">
+                <label className="text-[10px] uppercase font-bold text-zinc-400 block font-mono">Verify 6-Digit Code</label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="Enter Customer Code"
+                  value={pickupCodeInput}
+                  onChange={(e) => setPickupCodeInput(e.target.value.replace(/\D/g, ''))}
+                  className="w-full bg-zinc-950 border border-zinc-800 text-brand-offwhite font-mono text-center font-bold tracking-widest px-3 py-2 text-sm focus:outline-none focus:border-purple-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleStatusChange('collected', { pickupCode: pickupCodeInput })}
+                  disabled={pickupCodeInput.length !== 6 || isUpdatingStatus}
+                  className="w-full bg-white hover:bg-zinc-200 text-black py-2.5 font-bold uppercase tracking-wider text-xs transition-colors flex items-center justify-center gap-1 disabled:opacity-40"
+                >
+                  Verify &amp; Mark Collected
+                </button>
+              </div>
+            )}
+
+            {(order.order_status === 'delivered' || order.order_status === 'collected' || order.order_status === 'cancelled') && (
               <p className="text-[10px] text-zinc-500 bg-zinc-950 p-2.5 rounded leading-normal border border-zinc-850">
                 This order is in a final state (<strong>{order.order_status}</strong>). Workflow updates are locked.
               </p>
@@ -414,30 +471,51 @@ export default function AdminOrderDetail() {
                 <Phone className="w-4 h-4 text-zinc-600 flex-shrink-0" />
                 <span className="text-zinc-400 font-mono font-medium">{order.customer_phone}</span>
               </div>
+              {order.payment_type === 'cod_with_deposit' && order.verified_phone && (
+                <div className="pt-2 border-t border-zinc-850/60 mt-2 space-y-1 bg-zinc-950/40 p-2.5 rounded">
+                  <span className="text-[10px] text-green-400 font-bold uppercase tracking-wider block flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5" /> OTP Verified Mobile
+                  </span>
+                  <span className="text-zinc-300 font-mono font-bold">{order.verified_phone}</span>
+                </div>
+              )}
             </div>
 
-            {/* Shipping Address */}
+            {/* Shipping / Collection Details */}
             <div className="pt-4 border-t border-zinc-850 space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-zinc-500 block uppercase tracking-wider text-[10px] font-bold flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5 text-zinc-600" />
-                  Shipping Address
+                  {order.fulfillment_type === 'pickup' ? 'Collection Point' : 'Shipping Address'}
                 </span>
-                <button
-                  onClick={copyToClipboard}
-                  className="text-zinc-500 hover:text-brand-offwhite text-[10px] uppercase font-bold tracking-widest border border-zinc-800 hover:border-zinc-700 bg-zinc-950/40 px-2 py-1 rounded flex items-center gap-1.5 transition-colors"
-                >
-                  {isCopied ? <Check className="w-3 h-3 text-green-500" /> : <Clipboard className="w-3 h-3" />}
-                  {isCopied ? 'Copied' : 'Copy'}
-                </button>
+                {order.fulfillment_type !== 'pickup' && (
+                  <button
+                    onClick={copyToClipboard}
+                    className="text-zinc-500 hover:text-brand-offwhite text-[10px] uppercase font-bold tracking-widest border border-zinc-800 hover:border-zinc-700 bg-zinc-950/40 px-2 py-1 rounded flex items-center gap-1.5 transition-colors"
+                  >
+                    {isCopied ? <Check className="w-3 h-3 text-green-500" /> : <Clipboard className="w-3 h-3" />}
+                    {isCopied ? 'Copied' : 'Copy'}
+                  </button>
+                )}
               </div>
               
               <div className="text-xs bg-zinc-950/40 border border-zinc-850/60 p-4 rounded text-zinc-400 space-y-1.5 leading-relaxed">
-                <p className="font-bold text-brand-offwhite">{order.customer_name}</p>
-                <p>{orderAddress.line1}</p>
-                {orderAddress.line2 && <p>{orderAddress.line2}</p>}
-                <p>{orderAddress.city}, {orderAddress.state} - {orderAddress.pincode}</p>
-                <p className="font-mono text-zinc-500 mt-1">{order.customer_phone}</p>
+                {order.fulfillment_type === 'pickup' ? (
+                  <>
+                    <p className="font-bold text-brand-offwhite">📍 INDIRANAGAR STORE PICKUP</p>
+                    <p>DRFTN Flagship Store</p>
+                    <p>100 Feet Road, Indiranagar, Bengaluru, KA - 560038</p>
+                    <p className="font-mono text-zinc-500 mt-2">📞 {order.customer_phone}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-bold text-brand-offwhite">{order.customer_name}</p>
+                    <p>{orderAddress?.line1}</p>
+                    {orderAddress?.line2 && <p>{orderAddress.line2}</p>}
+                    <p>{orderAddress?.city}, {orderAddress?.state} - {orderAddress?.pincode}</p>
+                    <p className="font-mono text-zinc-500 mt-1">{order.customer_phone}</p>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -458,6 +536,28 @@ export default function AdminOrderDetail() {
                   {order.payment_status}
                 </span>
               </div>
+
+              <div className="flex justify-between items-center pt-1.5 border-t border-zinc-850/40">
+                <span className="text-zinc-500 block font-bold">Payment Type</span>
+                <span className="font-bold text-brand-offwhite uppercase tracking-wider">
+                  {order.payment_type === 'cod_with_deposit' ? 'COD + Deposit' : 'Prepaid (Full)'}
+                </span>
+              </div>
+
+              {order.payment_type === 'cod_with_deposit' && (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500 block font-bold">Paid Deposit</span>
+                    <span className="font-bold text-green-400 font-mono">₹200.00</span>
+                  </div>
+                  <div className="flex justify-between items-center p-2 bg-yellow-500/5 border border-yellow-500/10 rounded">
+                    <span className="text-yellow-600 block font-bold uppercase tracking-wider text-[9px]">Remaining cash due</span>
+                    <span className="font-extrabold text-yellow-500 font-mono text-sm">
+                      ₹{(((order.remaining_amount || 0)) / 100).toFixed(2)}
+                    </span>
+                  </div>
+                </>
+              )}
 
               {order.payment_id && (
                 <div>

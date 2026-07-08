@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { ChevronDown, Search, SlidersHorizontal, Grid3X3, Grid2X2, ArrowUpDown, X, Sparkles, Plus, ShoppingBag } from 'lucide-react';
 import { dbService } from '@/lib/db';
 import { Product, Category } from '@/types';
@@ -67,13 +68,15 @@ export default function ShopPage() {
 function ShopProductCard({
   prod,
   onQuickAdd,
-  aspectClass = 'aspect-[3/4]'
+  aspectClass = 'aspect-[4/5]'
 }: {
   prod: Product;
   onQuickAdd: (e: React.MouseEvent, p: Product) => void;
   aspectClass?: string;
 }) {
   const [isAdding, setIsAdding] = useState(false);
+
+  const isOutOfStock = prod.sizes.every((s) => (prod.stock_quantity[s] || 0) === 0);
 
   const handleQuickAddClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -85,73 +88,100 @@ function ShopProductCard({
   };
 
   return (
-    <Link
-      href={`/shop/${prod.slug}`}
-      className="group flex flex-col product-card"
-      aria-label={`View ${prod.name} — ₹${(prod.price / 100).toLocaleString('en-IN')}`}
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-10%' }}
+      transition={{ duration: 0.4, ease: 'easeOut' }}
+      className="w-full"
     >
-      {/* Image Container */}
-      <div className={`product-card-image bg-brand-graphite relative overflow-hidden ${aspectClass}`}>
-        <Image
-          src={prod.images[0] || 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800'}
-          alt={`${prod.name} — ${prod.category} by DRFTN Clothing`}
-          fill
-          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          className="object-cover transition-transform duration-700 ease-luxury"
-        />
-        <div className="product-card-overlay" aria-hidden="true" />
+      <Link
+        href={`/shop/${prod.slug}`}
+        className="group flex flex-col product-card text-left"
+        aria-label={`View ${prod.name} — ₹${(prod.price / 100).toLocaleString('en-IN')}`}
+      >
+        <motion.div
+          whileTap={{ scale: 0.97, filter: 'brightness(1.08)' }}
+          transition={{ duration: 0.15 }}
+          className="flex flex-col w-full text-left"
+        >
+          {/* Image Container */}
+          <div className={`relative overflow-hidden rounded-xl bg-brand-charcoal ${aspectClass} w-full border border-white/[0.08] shadow-[0_12px_40px_rgba(0,0,0,0.5)]`}>
+            <Image
+              src={prod.images[0] || 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800'}
+              alt={`${prod.name} — ${prod.category} by DRFTN Clothing`}
+              fill
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              className="object-cover transition-transform duration-[750ms] ease-out group-hover:scale-[1.01]"
+            />
+            {/* Bottom Gradient Legibility Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent pointer-events-none" />
 
-        {/* Sale Badge */}
-        {prod.compare_price && prod.compare_price > prod.price && (
-          <span className="absolute top-3 left-3 border border-brand-offwhite/30 text-brand-offwhite text-[9px] tracking-[0.2em] font-semibold py-1 px-2.5 uppercase bg-brand-black/60 backdrop-blur-sm z-10">
-            Sale
-          </span>
-        )}
+            {/* Sale Outlined Badge */}
+            {isOutOfStock ? (
+              <div className="absolute top-3.5 left-3.5 z-20 border border-white/10 text-white/50 bg-black/40 px-2 py-0.5 rounded-full backdrop-blur-[2px]">
+                <span className="text-[9px] font-mono font-bold tracking-widest uppercase">
+                  SOLD OUT
+                </span>
+              </div>
+            ) : prod.compare_price && prod.compare_price > prod.price ? (
+              <div className="absolute top-3.5 left-3.5 z-20 border border-white/20 text-white/95 bg-black/40 px-2 py-0.5 rounded-full backdrop-blur-[2px]">
+                <span className="text-[9px] font-mono font-bold tracking-widest uppercase">
+                  SALE
+                </span>
+              </div>
+            ) : null}
 
-        {/* Corner-Anchored Quick Add */}
-        <div className="absolute bottom-3 right-3 z-10">
-          <button
-            onClick={handleQuickAddClick}
-            disabled={isAdding}
-            className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg group/btn relative ${
-              isAdding 
-                ? 'bg-brand-red border-brand-red text-white' 
-                : 'bg-brand-black/90 border-zinc-800 hover:border-brand-offwhite text-brand-offwhite hover:bg-brand-offwhite hover:text-brand-black'
-            } opacity-100 scale-100 md:opacity-0 md:scale-95 group-hover:md:opacity-100 group-hover:md:scale-100`}
-            aria-label={`Quick add ${prod.name} to cart`}
-          >
-            <span className="absolute bottom-12 right-0 bg-brand-black border border-zinc-800 text-brand-offwhite text-[9px] tracking-widest uppercase py-1 px-2 opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20">
-              {isAdding ? 'Added' : 'Quick Add'}
-            </span>
-            {isAdding ? (
-              <span className="text-xs font-bold font-mono">✓</span>
-            ) : (
-              <Plus className="w-4 h-4" />
+            {/* Corner-Anchored Quick Add */}
+            {!isOutOfStock && (
+              <div className="absolute bottom-3.5 right-3.5 z-10">
+                <button
+                  onClick={handleQuickAddClick}
+                  disabled={isAdding}
+                  className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg ${
+                    isAdding 
+                      ? 'bg-white text-black border border-white' 
+                      : 'bg-black/60 hover:bg-black/80 text-white border border-white/10'
+                  }`}
+                  aria-label={`Quick add ${prod.name} to cart`}
+                >
+                  {isAdding ? (
+                    <span className="text-xs font-bold font-mono">✓</span>
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             )}
-          </button>
-        </div>
-      </div>
+          </div>
 
-      {/* Product Details */}
-      <div className="pt-3 space-y-1">
-        <p className="text-[9px] text-brand-stone uppercase tracking-[0.2em] font-semibold">
-          {prod.category}
-        </p>
-        <h3 className="text-xs font-medium text-brand-offwhite tracking-wide uppercase line-clamp-1 group-hover:text-brand-amber transition-colors duration-200 font-body">
-          {prod.name}
-        </h3>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-brand-offwhite font-body">
-            ₹{(prod.price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
-          </span>
-          {prod.compare_price && prod.compare_price > prod.price && (
-            <span className="text-[10px] text-brand-stone line-through">
-              ₹{(prod.compare_price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
-            </span>
-          )}
-        </div>
-      </div>
-    </Link>
+          {/* Product Details (Unified Rhythm) */}
+          <div className="pt-3 pb-1 flex flex-col text-left space-y-1">
+            <p className="text-[9px] text-brand-stone uppercase tracking-[0.2em] font-semibold">
+              {prod.category}
+            </p>
+            <h3 className="text-xs font-semibold text-brand-offwhite tracking-wide uppercase line-clamp-1 group-hover:text-white transition-colors duration-200 font-body">
+              {prod.name}
+            </h3>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-brand-offwhite font-body">
+                ₹{(prod.price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+              </span>
+              {prod.compare_price && prod.compare_price > prod.price && (
+                <>
+                  <span className="text-[10px] text-brand-stone line-through">
+                    ₹{(prod.compare_price / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                  </span>
+                  <span className="text-[10px] font-mono text-white/50 tracking-wider">
+                    -{Math.round(((prod.compare_price - prod.price) / prod.compare_price) * 100)}%
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      </Link>
+    </motion.div>
   );
 }
 
@@ -546,7 +576,7 @@ function ShopContent() {
           <>
             {/* Product grid: 2-col mobile, 3-col tablet, 4-col desktop */}
             <div
-              className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5 md:gap-6 lg:gap-8"
+              className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-[8px] md:gap-6 lg:gap-8"
               role="list"
               aria-label={`${filteredProducts.length} products`}
             >

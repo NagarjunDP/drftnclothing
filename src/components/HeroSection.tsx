@@ -4,6 +4,7 @@ import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { motion, useReducedMotion } from 'framer-motion';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -15,12 +16,12 @@ interface HeroSectionProps {
 
 export default function HeroSection(props: HeroSectionProps) {
   const heroRef = useRef<HTMLDivElement>(null);
+  const shouldReduceMotion = useReducedMotion() ?? false;
 
   useEffect(() => {
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (prefersReducedMotion) {
-      gsap.set('.hero-stagger-line', { opacity: 1, y: 0 });
       gsap.set('.hero-fade-in', { opacity: 1, y: 0 });
       return;
     }
@@ -105,18 +106,7 @@ export default function HeroSection(props: HeroSectionProps) {
       flickerTimeout = setTimeout(triggerFlicker, 3000);
     }
 
-    // 4. Staggered fade + slide up + scale punch for integrated headline lines
-    gsap.fromTo('.hero-stagger-line', 
-      { opacity: 0, y: 30, scale: 1.05 },
-      { 
-        opacity: 1, 
-        y: 0, 
-        scale: 1,
-        duration: 0.8, 
-        stagger: 0.12, 
-        ease: 'back.out(1.25)' 
-      }
-    );
+    // GSAP staggered headline animation removed (now handled by Framer Motion)
 
     // 5. Fade + slide up for eyebrow, subcopy, and CTA buttons
     gsap.fromTo('.hero-fade-in', 
@@ -186,6 +176,21 @@ export default function HeroSection(props: HeroSectionProps) {
       ref={heroRef}
       className="relative w-full h-[80vh] sm:h-[95vh] min-h-[500px] sm:min-h-[600px] bg-black overflow-hidden flex items-center justify-start px-7 md:px-16 lg:px-24"
     >
+      {/* ── Soft Drifting Ambient background glow (no color hues) ── */}
+      {!shouldReduceMotion && (
+        <motion.div
+          className="absolute left-[15%] top-[25%] w-[320px] h-[320px] rounded-full bg-white/[0.07] blur-[110px] pointer-events-none z-10"
+          animate={{
+            x: [0, 35, -20, 0],
+            y: [0, -40, 25, 0],
+          }}
+          transition={{
+            duration: 12,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }}
+        />
+      )}
       
       {/* ── Background Photographic Asset & Filters (5 Parallax Layers) ── */}
       <div className="absolute inset-0 z-0 overflow-hidden select-none pointer-events-none">
@@ -221,7 +226,7 @@ export default function HeroSection(props: HeroSectionProps) {
         {/* ── Transitional Beat: Drift in Style (Layer 2.5: Physically behind Layer 3 model) ── */}
         <div className="absolute inset-0 w-full h-full hero-scroll-layer" data-depth="0.35" style={{ willChange: 'transform' }}>
           <div className="absolute inset-0 w-full h-full hero-cursor-layer" data-depth="0.35" style={{ willChange: 'transform' }}>
-            <div className="absolute top-[28%] md:top-[32%] right-[6%] sm:right-[8%] md:right-[10%] lg:right-[12%] z-10 pointer-events-none hero-drift-container text-right flex flex-col items-end select-none">
+            <div className="absolute top-[28%] md:top-[32%] right-[6%] sm:right-[8%] md:right-[10%] lg:right-[12%] z-10 pointer-events-none hero-drift-container text-right flex-col items-end select-none hidden md:flex">
               <span className="hero-drift-word opacity-0 block font-body font-light italic text-zinc-400 text-[clamp(1.8rem,8vw,3rem)] sm:text-[clamp(2.5rem,7vw,4rem)] lg:text-[clamp(3.8rem,5.5vw,4.8rem)] leading-[0.8] tracking-tighter uppercase">
                 Drift
               </span>
@@ -311,30 +316,135 @@ export default function HeroSection(props: HeroSectionProps) {
         <div className="flex flex-col pointer-events-auto">
           
           {/* Eyebrow Label (margin: 16px to headline) */}
-          <span className="hero-fade-in opacity-0 text-brand-red text-xs md:text-sm font-bold tracking-[0.25em] uppercase block font-body mb-2 md:mb-4">
+          <span className="hero-fade-in opacity-0 text-white/60 text-xs md:text-sm font-bold tracking-[0.25em] uppercase block font-body mb-2 md:mb-4">
             DRFTN ORIGINALS — MID-SEASON 02
           </span>
           
           {/* Integrated Typography: Large font with outline middle word overlapping the model subject */}
-          <h1 className="text-white text-[clamp(2.5rem,11vw,4.5rem)] sm:text-[clamp(4rem,10vw,6rem)] lg:text-[clamp(5.5rem,8.5vw,7.2rem)] font-black tracking-tighter uppercase leading-[0.8] font-display flex flex-col mb-5 md:mb-8 select-none">
+          {/* Mobile version (two stacked lines, tighter spacing) */}
+          <h1 className="text-white text-[clamp(2.3rem,11vw,4rem)] font-black tracking-tighter uppercase leading-[0.95] font-display flex flex-col mb-3 select-none md:hidden">
+            <span className="inline-block overflow-hidden py-0.5">
+              <motion.span
+                initial={shouldReduceMotion ? { opacity: 1 } : { y: 24, filter: 'blur(8px)', opacity: 0 }}
+                animate={{ y: 0, filter: 'blur(0px)', opacity: 1 }}
+                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                className="inline-block"
+              >
+                CONTROL THE
+              </motion.span>
+            </span>
+            <div className="relative mt-1 w-full h-[54px] flex items-center">
+              {/* Ambient Glow Pulse behind outlined text */}
+              {!shouldReduceMotion && (
+                <motion.div
+                  className="absolute left-6 w-[180px] h-[30px] bg-white/20 blur-[28px] rounded-full pointer-events-none"
+                  initial={{ opacity: 0.15 }}
+                  animate={{ opacity: [0.15, 0.35, 0.15] }}
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                    delay: 1.2,
+                  }}
+                />
+              )}
+              {shouldReduceMotion ? (
+                <span className="text-transparent font-display font-black tracking-tighter uppercase text-[50px] leading-none" style={{ WebkitTextStroke: '1.5px rgba(255, 255, 255, 0.8)' }}>
+                  CHAOS.
+                </span>
+              ) : (
+                <svg viewBox="0 0 350 70" className="w-full h-full overflow-visible z-10">
+                  <defs>
+                    <linearGradient id="glowGradMobile" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="rgba(255,255,255,0.45)" />
+                      <stop offset="50%" stopColor="rgba(255,255,255,1)" />
+                      <stop offset="100%" stopColor="rgba(255,255,255,0.45)" />
+                    </linearGradient>
+                  </defs>
+                  <motion.text
+                    x="0"
+                    y="55"
+                    fill="none"
+                    stroke="url(#glowGradMobile)"
+                    strokeWidth="1.6"
+                    className="font-display font-black tracking-tighter uppercase text-[50px]"
+                    initial={{ strokeDashoffset: 600, strokeDasharray: '80 520' }}
+                    animate={{ strokeDashoffset: 0, strokeDasharray: '600 0' }}
+                    transition={{ duration: 1.2, ease: 'easeInOut', delay: 0.15 }}
+                  >
+                    CHAOS.
+                  </motion.text>
+                </svg>
+              )}
+            </div>
+          </h1>
+
+          {/* Desktop version (three lines, untouched style except outline text tracing) */}
+          <h1 className="hidden md:flex text-white text-[clamp(4.5rem,10vw,6.5rem)] lg:text-[clamp(5.5rem,8.5vw,7.2rem)] font-black tracking-tighter uppercase leading-[0.8] font-display flex-col mb-5 md:mb-8 select-none">
             <span className="inline-block overflow-hidden py-1">
-              <span className="hero-stagger-line opacity-0 inline-block">
+              <motion.span
+                initial={shouldReduceMotion ? { opacity: 1 } : { y: 24, filter: 'blur(8px)', opacity: 0 }}
+                animate={{ y: 0, filter: 'blur(0px)', opacity: 1 }}
+                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                className="inline-block"
+              >
                 CONTROL
-              </span>
+              </motion.span>
             </span>
             <span className="inline-block overflow-hidden py-1">
-              <span 
-                className="hero-stagger-line opacity-0 inline-block text-transparent"
-                style={{ WebkitTextStroke: '1.5px rgba(255, 255, 255, 0.8)' }}
+              <motion.span
+                initial={shouldReduceMotion ? { opacity: 1 } : { y: 24, filter: 'blur(8px)', opacity: 0 }}
+                animate={{ y: 0, filter: 'blur(0px)', opacity: 1 }}
+                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+                className="inline-block"
               >
                 THE
-              </span>
+              </motion.span>
             </span>
-            <span className="inline-block overflow-hidden py-1 text-brand-red">
-              <span className="hero-stagger-line opacity-0 inline-block">
-                CHAOS.
-              </span>
-            </span>
+            <div className="relative mt-2 w-[550px] h-[130px] flex items-center">
+              {/* Ambient Glow Pulse behind outlined text */}
+              {!shouldReduceMotion && (
+                <motion.div
+                  className="absolute left-10 w-[350px] h-[60px] bg-white/15 blur-[45px] rounded-full pointer-events-none"
+                  initial={{ opacity: 0.15 }}
+                  animate={{ opacity: [0.15, 0.3, 0.15] }}
+                  transition={{
+                    duration: 4.5,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                    delay: 1.3,
+                  }}
+                />
+              )}
+              {shouldReduceMotion ? (
+                <span className="text-transparent font-display font-black tracking-tighter uppercase text-[105px]" style={{ WebkitTextStroke: '2.2px rgba(255, 255, 255, 0.8)' }}>
+                  CHAOS.
+                </span>
+              ) : (
+                <svg viewBox="0 0 550 130" className="w-full h-full overflow-visible z-10">
+                  <defs>
+                    <linearGradient id="glowGradDesktop" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="rgba(255,255,255,0.4)" />
+                      <stop offset="50%" stopColor="rgba(255,255,255,1)" />
+                      <stop offset="100%" stopColor="rgba(255,255,255,0.4)" />
+                    </linearGradient>
+                  </defs>
+                  <motion.text
+                    x="0"
+                    y="105"
+                    fill="none"
+                    stroke="url(#glowGradDesktop)"
+                    strokeWidth="2.2"
+                    className="font-display font-black tracking-tighter uppercase text-[105px]"
+                    initial={{ strokeDashoffset: 900, strokeDasharray: '120 780' }}
+                    animate={{ strokeDashoffset: 0, strokeDasharray: '900 0' }}
+                    transition={{ duration: 1.2, ease: 'easeInOut', delay: 0.25 }}
+                  >
+                    CHAOS.
+                  </motion.text>
+                </svg>
+              )}
+            </div>
           </h1>
 
           {/* Subcopy (margin: 32px to CTA) */}
@@ -344,18 +454,28 @@ export default function HeroSection(props: HeroSectionProps) {
 
           {/* CTA Buttons */}
           <div className="hero-fade-in opacity-0 flex flex-wrap gap-4">
-            <a
+            <motion.a
               href="/shop"
+              whileTap={shouldReduceMotion ? {} : {
+                textShadow: '0 0 12px rgba(255,255,255,0.6)',
+                scale: 0.98
+              }}
+              transition={{ duration: 0.15 }}
               className="btn-primary-accent transition-all duration-200 active:scale-95"
             >
               SHOP COLLECTION
-            </a>
-            <a
+            </motion.a>
+            <motion.a
               href="#story"
+              whileTap={shouldReduceMotion ? {} : {
+                textShadow: '0 0 12px rgba(255,255,255,0.6)',
+                scale: 0.98
+              }}
+              transition={{ duration: 0.15 }}
               className="btn-secondary-dark transition-all duration-200 active:scale-95"
             >
               OUR ORIGINS
-            </a>
+            </motion.a>
           </div>
         </div>
       </div>

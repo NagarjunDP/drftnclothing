@@ -72,7 +72,7 @@ export default function TrackOrderPage() {
                 placeholder="e.g. DRFTN-1001"
                 value={orderNumber}
                 onChange={(e) => setOrderNumber(e.target.value)}
-                className="w-full bg-zinc-900/80 border border-zinc-800 text-brand-offwhite px-4 py-3 focus:outline-none focus:border-brand-red transition-colors"
+                className="w-full bg-zinc-900/80 border border-zinc-800 text-brand-offwhite px-4 py-3 focus:outline-none focus:border-white transition-colors"
                 required
               />
             </div>
@@ -83,7 +83,7 @@ export default function TrackOrderPage() {
                 placeholder="Entered at checkout"
                 value={contact}
                 onChange={(e) => setContact(e.target.value)}
-                className="w-full bg-zinc-900/80 border border-zinc-800 text-brand-offwhite px-4 py-3 focus:outline-none focus:border-brand-red transition-colors"
+                className="w-full bg-zinc-900/80 border border-zinc-800 text-brand-offwhite px-4 py-3 focus:outline-none focus:border-white transition-colors"
                 required
               />
             </div>
@@ -91,7 +91,7 @@ export default function TrackOrderPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-brand-red text-white px-8 py-4 font-bold uppercase tracking-widest text-sm hover:bg-red-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full bg-white text-black px-8 py-4 font-bold uppercase tracking-widest text-sm hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {isLoading ? 'Searching...' : 'Track Order'}
             {!isLoading && <Search className="w-4 h-4" />}
@@ -115,14 +115,14 @@ export default function TrackOrderPage() {
           </div>
 
           {order.order_status === 'cancelled' ? (
-            <div className="bg-red-950/30 border border-red-900/50 text-red-500 p-6 text-center font-bold tracking-widest uppercase text-sm mb-10">
+            <div className="bg-zinc-950 border border-zinc-800 text-zinc-400 p-6 text-center font-bold tracking-widest uppercase text-sm mb-10">
               This order has been cancelled.
             </div>
           ) : (
             <div className="relative mb-12 py-4">
               <div className="absolute top-1/2 left-0 w-full h-1 bg-zinc-800 -translate-y-1/2 hidden md:block" />
               <div
-                className="absolute top-1/2 left-0 h-1 bg-brand-red -translate-y-1/2 hidden md:block transition-all duration-1000"
+                className="absolute top-1/2 left-0 h-1 bg-white -translate-y-1/2 hidden md:block transition-all duration-1000"
                 style={{
                   width: `${(Math.max(0, getStatusIndex(order.order_status)) / (STATUS_STAGES.length - 1)) * 100}%`,
                 }}
@@ -142,7 +142,7 @@ export default function TrackOrderPage() {
                       <div
                         className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors ${
                           isCompleted
-                            ? 'bg-brand-red border-brand-red text-white'
+                            ? 'bg-white border-white text-black'
                             : 'bg-zinc-900 border-zinc-700 text-zinc-600'
                         }`}
                       >
@@ -157,7 +157,7 @@ export default function TrackOrderPage() {
                           {stage.label}
                         </p>
                         {isCurrent && order.tracking_number && stage.id === 'shipped' && (
-                          <p className="text-xs text-brand-red mt-1 font-mono">AWB: {order.tracking_number}</p>
+                          <p className="text-xs text-white/80 mt-1 font-mono">AWB: {order.tracking_number}</p>
                         )}
                         {isCurrent && order.courier_partner && stage.id === 'shipped' && (
                           <p className="text-xs text-zinc-400 mt-1">{order.courier_partner}</p>

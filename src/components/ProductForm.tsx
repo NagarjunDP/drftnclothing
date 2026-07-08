@@ -116,7 +116,7 @@ export default function ProductForm({ initialData, mode }: ProductFormProps) {
       setIsFeatured(initialData.is_featured);
       setIsActive(initialData.is_active);
     }
-  }, [initialData]);
+  }, [initialData?.id]);
 
   // Auto-slugify name
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {

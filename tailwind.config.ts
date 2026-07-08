@@ -15,7 +15,7 @@ const config: Config = {
           black: "#0A0A0A",
           offwhite: "#F5F5F3",
           cream: "#EAE7E0",
-          red: "#F5F5F3",
+          red: "#FFFFFF",
           crimson: "#FFFFFF",
           charcoal: "#121212",
           graphite: "#222222",

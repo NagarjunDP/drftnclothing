@@ -34,13 +34,13 @@ export interface Order {
   customer_name: string;
   customer_email: string;
   customer_phone: string;
-  shipping_address: {
+  shipping_address?: {
     line1: string;
     line2?: string;
     city: string;
     state: string;
     pincode: string;
-  };
+  } | null;
   items: CartItem[];
   subtotal: number;
   shipping_charge: number;
@@ -50,10 +50,18 @@ export interface Order {
   payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
   payment_id?: string;
   razorpay_order_id?: string | null;
-  order_status: 'placed' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled';
+  order_status: 'placed' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled' | 'pending_payment' | 'payment_verifying' | 'failed' | 'expired' | 'preparing' | 'ready_for_pickup' | 'collected' | 'payment_mismatch';
+  fulfillment_type?: 'delivery' | 'pickup';
+  pickup_status?: 'awaiting_pickup' | 'ready_for_pickup' | 'collected' | null;
+  pickup_code?: string | null;
   tracking_number?: string;
   courier_partner?: string;
   shiprocket_order_id?: string | null;
+  payment_type?: 'prepaid' | 'cod_with_deposit';
+  deposit_amount?: number | null;
+  remaining_amount?: number | null;
+  deposit_status?: 'pending' | 'paid' | 'failed' | null;
+  verified_phone?: string | null;
   created_at?: string;
 }
 
